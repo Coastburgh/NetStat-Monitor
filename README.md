@@ -22,7 +22,7 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 ## Tecnologias
 
 - **Linguagem:** Python
-- **Coleta de dados:** `ping3` ou `subprocess`
+- **Coleta de dados:** `subprocess`
 - **Armazenamento:** CSV ou SQLite
 - **Análise estatística:** `pandas`, `numpy`, `scipy`
 - **Visualização:** `matplotlib` (e, opcionalmente, um painel com `streamlit`)
