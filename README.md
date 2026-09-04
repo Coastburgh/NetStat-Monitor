@@ -25,7 +25,7 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 - **Coleta de dados:** `subprocess`
 - **Armazenamento:** CSV ou SQLite
 - **Análise estatística:** `pandas`, `numpy`, `scipy`
-- **Visualização:** `matplotlib` (e, opcionalmente, um painel com `streamlit`)
+- **Visualização:** `matplotlib` e painel com `streamlit`
 - **Inspeção de tráfego:** Wireshark
 
 ## Mapeamento com o Conteúdo das Disciplinas
@@ -50,5 +50,62 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 | Protocolos (ICMP) | Implícito na coleta, citado explicitamente no relatório final |
 
 ## Status
+### Configuração e Estrutura do Projeto
 
-Projeto em fase inicial de desenvolvimento — Etapa 02 (Descrição da Ideia + Persona + Requisitos Funcionais) concluída e entregue.
+- [x] Repositório Git criado
+- [x] Ambiente virtual (venv) configurado
+- [x] `requirements.txt`
+- [x] Estrutura de pastas (`coletor/`, `armazenamento/`, `analise/`, `visualizacao/`, `dados/`)
+- [x] `.gitignore` configurado (venv, cache, dados coletados)
+- [x] `README.md`
+- [x] Glossário de termos técnicos
+- [x] Documentos entregues ao professor: objetivo + integrantes, escopo do projeto, Etapa 02 (descrição, persona, requisitos funcionais)
+
+### Coleta de Dados
+
+- [x] Configurar host de destino (**req. 1**)
+- [x] Definir intervalo entre coletas (**req. 2**)
+- [x] Coleta periódica de latência via ping (**req. 3**)
+- [x] Registrar perda de pacotes (**req. 4**)
+- [x] Calcular jitter (**req. 5**)
+- [x] Tratamento de erros/timeouts sem interromper a coleta (**req. 8**)
+- [x] Execução contínua em segundo plano (**req. 9**)
+- [x] Coleta simultânea de múltiplos destinos via threading (**req. 10**)
+- [x] Rótulo de sessão (Wi-Fi / Cabo) para permitir comparação futura
+- [ ] Coleta de dados reais em andamento (dias de Wi-Fi e de cabo)
+
+### Armazenamento de Dados
+
+- [x] Armazenamento em CSV (**req. 6**)
+- [x] Suporte alternativo em SQLite (**req. 7**)
+
+### Análise Estatística
+
+- [x] Estatística descritiva: média, mediana, desvio padrão, percentis (**req. 11**)
+- [ ] Detecção de outliers por z-score (**req. 12**)
+- [ ] Detecção de outliers por IQR (**req. 13**)
+- [ ] Correlação entre horário do dia e latência (**req. 14**)
+- [ ] Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)
+
+### Visualização e Interface
+
+- [ ] Gráficos de série temporal (**req. 16**)
+- [ ] Histogramas de distribuição (**req. 17**)
+- [ ] Destaque visual de outliers nos gráficos (**req. 18**)
+- [ ] Painel interativo com Streamlit (**req. 19**)
+
+### Relatório Final
+
+- [ ] Geração de relatório consolidado com estatísticas, gráficos e conclusões (**req. 20**)
+
+### Ferramentas de Apoio ao Desenvolvimento (fora da contagem de requisitos)
+
+- [x] Script gerador de dados sintéticos, para testar a análise sem depender de dias de coleta real
+
+### Fora do Escopo Confirmado
+
+- [ ] *(incerto, em avaliação pelo grupo)* Comparação com modelo teórico de Teoria das Filas (M/M/1)
+- Comparação de desempenho entre TCP e UDP
+- Modelos de machine learning para previsão ou detecção de anomalias
+- Monitoramento de redes de terceiros
+- Aplicativo mobile ou GUI desktop tradicional
