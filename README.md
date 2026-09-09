@@ -82,6 +82,9 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 ### Análise Estatística
 
 - [x] Estatística descritiva: média, mediana, desvio padrão, percentis (**req. 11**)
+- [x] Detecção de outliers por z-score (**req. 12**)
+- [x] Detecção de outliers por IQR (**req. 13**)
+- [x] Correlação entre horário do dia e latência (**req. 14**)
 - [ ] Detecção de outliers por IQR (**req. 13**)
 - [ ] Correlação entre horário do dia e latência (**req. 14**)
 - [ ] Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)
