@@ -6,9 +6,8 @@ Módulo responsável pela análise estatística das medições coletadas.
 Cobre os requisitos funcionais:
 11. Calcular estatísticas descritivas (média, mediana, desvio padrão e
     percentis) da latência coletada.
-12. Identificar outliers (picos anômalos de latência) utilizando o
-    método de z-score.
-13. Identificar outliers de forma alternativa utilizando o método do
+12. REMOVIDO
+13. Identificar outliers de (picos anômalos de latência) utilizando o método do
     intervalo interquartil (IQR).
 14. Permitir a análise de correlação entre o horário do dia e a
     latência observada.
