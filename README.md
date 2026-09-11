@@ -85,11 +85,11 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 - [ ] ~~Detecção de outliers por z-score (**req. 12**)~~
 - [x] Detecção de outliers por IQR (**req. 13**)
 - [x] Correlação entre horário do dia e latência (**req. 14**)
-- [ ] Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)
+- [ ] ~~Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)~~
 
 ### Visualização e Interface
 
-- [ ] Gráficos de série temporal (**req. 16**)
+- [x] Gráficos de série temporal (**req. 16**)
 - [ ] Histogramas de distribuição (**req. 17**)
 - [ ] Destaque visual de outliers nos gráficos (**req. 18**)
 - [ ] Painel interativo com Streamlit (**req. 19**)
