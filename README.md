@@ -11,7 +11,7 @@ O NetStat Monitor é um projeto de software voltado à coleta e análise estatí
 
 A coleta é planejada para ocorrer de forma contínua, em segundo plano, por vários dias e em condições variadas de uso — como redes Wi-Fi e cabeadas, em diferentes horários do dia — de modo a formar uma base de dados robusta o suficiente para sustentar uma análise estatística consistente. O tratamento de falhas comuns, como timeouts e hosts inacessíveis, é um ponto de atenção central do projeto, já que a coleta não pode ser interrompida por instabilidades momentâneas da rede.
 
-Sobre os dados coletados, o sistema aplica técnicas de estatística descritiva (média, mediana, desvio padrão e percentis) e métodos de detecção de outliers, como z-score e intervalo interquartil (IQR), para identificar picos anômalos de latência. Também é realizada uma análise de correlação entre o horário do dia e a latência observada, além de um teste de hipóteses (teste t) para comparar estatisticamente diferentes condições de rede, como Wi-Fi contra cabo ou horário de pico contra fora de pico.
+Sobre os dados coletados, o sistema aplica técnicas de estatística descritiva (média, mediana, desvio padrão e percentis) e detecção de outliers pelo intervalo interquartil (IQR), para identificar picos anômalos de latência. Também é realizada uma análise de correlação entre o horário do dia e a latência observada, além de um teste de hipóteses (teste t) para comparar estatisticamente diferentes condições de rede, como Wi-Fi contra cabo ou horário de pico contra fora de pico.
 
 Os resultados são apresentados por meio de gráficos de série temporal e histogramas de distribuição gerados com matplotlib, com destaque visual para os outliers detectados, podendo evoluir para um painel interativo construído com Streamlit. Complementarmente, o projeto utiliza o Wireshark para capturar e inspecionar visualmente os pacotes ICMP gerados durante os testes de ping, agregando uma camada de análise qualitativa do tráfego à análise estatística quantitativa.
 
@@ -82,7 +82,6 @@ O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística 
 ### Análise Estatística
 
 - [x] Estatística descritiva: média, mediana, desvio padrão, percentis (**req. 11**)
-- [ ] Detecção de outliers por z-score (**req. 12**)
 - [ ] Detecção de outliers por IQR (**req. 13**)
 - [ ] Correlação entre horário do dia e latência (**req. 14**)
 - [ ] Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)

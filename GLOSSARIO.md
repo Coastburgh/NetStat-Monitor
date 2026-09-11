@@ -45,11 +45,8 @@ Valor abaixo do qual se encontra uma determinada porcentagem dos dados (ex.: o p
 **Outlier**
 Valor que se distancia significativamente do padrão geral dos dados, podendo indicar uma anomalia real (como um pico de latência) ou um erro de medição.
 
-**Z-score**
-Medida que indica a quantos desvios padrão um valor está distante da média do conjunto de dados. Utilizado no projeto para identificar outliers de latência.
-
 **IQR (Intervalo Interquartil)**
-Diferença entre o terceiro quartil (Q3) e o primeiro quartil (Q1) de um conjunto de dados. Método alternativo ao z-score para identificar outliers, mais robusto a distribuições assimétricas.
+Diferença entre o terceiro quartil (Q3) e o primeiro quartil (Q1) de um conjunto de dados. Método utilizado no projeto para identificar outliers, sendo mais robusto a distribuições assimétricas.
 
 **Correlação**
 Medida estatística que indica o grau de associação entre duas variáveis (ex.: horário do dia e latência observada), variando entre -1 e 1.
