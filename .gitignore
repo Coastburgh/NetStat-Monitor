@@ -4,3 +4,4 @@ __pycache__/
 dados/*.csv
 *.sqlite
 .env
+*.png
