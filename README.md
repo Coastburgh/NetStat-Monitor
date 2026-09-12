@@ -2,7 +2,7 @@
 
 Projeto Integrador — Faculdade de Princípios Militares
 
-**Equipe:** Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique
+**Equipe:** Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique, Cid Mendes
 **Orientador:** Leonardo A. Portes
 
 ## Descrição do Projeto
