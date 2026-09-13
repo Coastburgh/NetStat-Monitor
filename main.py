@@ -20,7 +20,7 @@ from armazenamento.armazenamento import ArmazenamentoCSV
 # - Roteador local: linha de base da rede interna (ajuste para o IP real do seu roteador)
 # - 8.8.8.8 (Google DNS): referência externa principal
 # - 1.1.1.1 (Cloudflare DNS): referência externa de controle
-HOSTS_PARA_MONITORAR = ["192.168.100.1", "8.8.8.8", "1.1.1.1", "www.youtube.com", "www.github.com"]
+HOSTS_PARA_MONITORAR = ["192.168.100.1", "8.8.8.8", "1.1.1.1"]
 
 INTERVALO_SEGUNDOS = 5.0
 
