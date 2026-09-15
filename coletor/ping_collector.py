@@ -23,6 +23,7 @@ import time
 import subprocess
 import platform
 import re
+import threading
 
 from armazenamento.armazenamento import ArmazenamentoCSV
 
@@ -114,18 +115,28 @@ class PingCollector:
             "perda_pacotes_pct": perda_pacotes_pct,
         }
 
-    def iniciar_coleta_continua(self, callback):
+    def iniciar_coleta_continua(self, callback, stop_event=None):
         """
         Roda a coleta em loop, chamando callback(medicao) a cada medição.
-        callback é o ponto de extensão onde, nas próximas etapas, entrarão
-        o armazenamento em CSV/SQLite e o tratamento de erros mais robusto.
+
+        stop_event: opcional (threading.Event). Quando fornecido, o loop
+        verifica esse evento a cada iteração e para assim que ele for
+        sinalizado externamente (stop_event.set()) — necessário para
+        controlar a coleta a partir de uma interface como o Streamlit,
+        onde não existe Ctrl+C.
         """
         print(f"Iniciando coleta contínua para {self.host} "
               f"(intervalo: {self.intervalo_segundos}s, sistema: {self.sistema})")
-        while True:
+        while stop_event is None or not stop_event.is_set():
             medicao = self.coletar_uma_medicao()
             callback(medicao)
-            time.sleep(self.intervalo_segundos)
+            if stop_event is not None:
+                # wait() retorna assim que o evento for sinalizado, sem
+                # esperar o intervalo inteiro — a thread para na hora.
+                stop_event.wait(self.intervalo_segundos)
+            else:
+                time.sleep(self.intervalo_segundos)
+        print(f"Coleta interrompida para {self.host}.")
 
 
 def _exemplo_callback(medicao: dict):
