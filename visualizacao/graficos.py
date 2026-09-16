@@ -41,7 +41,8 @@ def gerar_grafico_serie_temporal(
     titulo: str = "Latência ao longo do tempo",
     rotulo_eixo_y: str = "Latência (ms)",
     agregacao: str = "15min",
-    cor_linha: str = "#0073ff"
+    cor_grafico: str = "#0073ff",
+    salvar_arquivo: bool = True
 ):
     """
     Gera um gráfico de linha interativo mostrando a evolução de uma métrica
@@ -62,9 +63,10 @@ def gerar_grafico_serie_temporal(
     Retorna a figura do Plotly (além de salvar o arquivo), para permitir
     reaproveitá-la diretamente no dashboard Streamlit mais adiante.
     """
-    pasta = os.path.dirname(caminho_saida)
-    if pasta and not os.path.exists(pasta):
-        os.makedirs(pasta)
+    if salvar_arquivo:
+        pasta = os.path.dirname(caminho_saida)
+        if pasta and not os.path.exists(pasta):
+            os.makedirs(pasta)
 
     if agregacao:
         df_indexado = df.set_index("timestamp")
@@ -77,7 +79,7 @@ def gerar_grafico_serie_temporal(
         x=df_plot["timestamp"],
         y=df_plot[coluna],
         mode="lines+markers",
-        line=dict(color=cor_linha, width=1, shape="spline", smoothing=0.8),
+        line=dict(color=cor_grafico, width=1, shape="spline", smoothing=0.8),
         marker=dict(size=4),
         name=rotulo_eixo_y,
         hovertemplate="%{x|%d/%m %H:%M}<br>%{y:.2f}<extra></extra>",
@@ -92,7 +94,9 @@ def gerar_grafico_serie_temporal(
         hovermode="x unified",
     )
 
-    fig.write_html(caminho_saida)
+    if salvar_arquivo:
+        fig.write_html(caminho_saida)
+
     return fig
 
 
@@ -128,6 +132,8 @@ def gerar_grafico_taxa_perda_pacotes(
     janela: str = "5min",
     caminho_saida: str = "dados/graficos/grafico_perda_pacotes.html",
     titulo: str = "Taxa de perda de pacotes ao longo do tempo",
+    cor_grafico: str = "#ff1c02",
+    salvar_arquivo: bool = True
 ):
     """
     Gera um gráfico de barras mostrando a taxa de perda de pacotes DENTRO
@@ -135,9 +141,10 @@ def gerar_grafico_taxa_perda_pacotes(
     pontuais de instabilidade que ficariam escondidos em uma métrica
     cumulativa desde o início da coleta.
     """
-    pasta = os.path.dirname(caminho_saida)
-    if pasta and not os.path.exists(pasta):
-        os.makedirs(pasta)
+    if salvar_arquivo:
+        pasta = os.path.dirname(caminho_saida)
+        if pasta and not os.path.exists(pasta):
+            os.makedirs(pasta)
 
     df_taxa = calcular_taxa_perda_por_janela(df, janela)
 
@@ -145,7 +152,7 @@ def gerar_grafico_taxa_perda_pacotes(
     fig.add_trace(go.Bar(
         x=df_taxa["timestamp"],
         y=df_taxa["perda_pct_na_janela"],
-        marker=dict(color="#ff1c02"),
+        marker=dict(color=cor_grafico),
         name="Perda de pacotes",
         hovertemplate="%{x|%d/%m %H:%M}<br>%{y:.2f}%%<extra></extra>",
     ))
@@ -158,7 +165,9 @@ def gerar_grafico_taxa_perda_pacotes(
         hovermode="x unified",
     )
 
-    fig.write_html(caminho_saida)
+    if salvar_arquivo:
+        fig.write_html(caminho_saida)
+
     return fig
 
 
@@ -197,7 +206,7 @@ if __name__ == "__main__":
         titulo="Latência ao longo do tempo — 8.8.8.8 (Ethernet)",
         rotulo_eixo_y="Latência (ms)",
         agregacao="15min",
-        cor_linha="#0073ff"
+        cor_grafico="#0073ff"
     )
     print("Gráfico de latência salvo em: dados/graficos/grafico_latencia_cabo.html")
  
@@ -208,7 +217,7 @@ if __name__ == "__main__":
         titulo="Jitter ao longo do tempo — 8.8.8.8 (Ethernet)",
         rotulo_eixo_y="Jitter (ms)",
         agregacao="15min",
-        cor_linha="#ffd900"
+        cor_grafico="#ffd900"
     )
     print("Gráfico de jitter salvo em: dados/graficos/grafico_jitter_cabo.html")
  
