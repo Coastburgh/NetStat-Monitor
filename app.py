@@ -1,11 +1,12 @@
 """
 app.py
 
-Painel Streamlit do NetStat Monitor — requisito 19.
+Painel Streamlit do NetStat Monitor.
 
-Permite escolher hosts, iniciar/parar a coleta e visualizar os gráficos
-em tempo quase real, tudo pelo navegador, sem precisar do terminal
-(além do comando único para abrir o painel: streamlit run app.py).
+Permite configurar hosts das camadas LAN, MAN e WAN, iniciar e interromper
+coletas em tempo real e visualizar métricas de latência, jitter e perda de
+pacotes em uma interface web. Os valores podem ser informados manualmente ou
+preenchidos automaticamente por detecção do gateway e do primeiro host externo.
 """
 
 import os

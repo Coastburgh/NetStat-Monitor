@@ -2,21 +2,13 @@
 coletor/ping_collector.py
 
 Módulo responsável pela coleta periódica de latência via ping.
-Usa o comando "ping" nativo do sistema operacional via subprocess,
-evitando a necessidade de privilégios de administrador no Windows
-(diferente do uso de sockets ICMP brutos, como faz a biblioteca ping3).
+Usa o comando "ping" nativo do sistema operacional por meio de subprocess,
+evitando a necessidade de privilégios de administrador no Windows e mantendo
+a coleta robusta frente a timeouts e hosts inacessíveis.
 
-Cobre os requisitos funcionais:
-1. Configurar o host de destino.
-2. Definir o intervalo entre as coletas.
-3. Coletar periodicamente o tempo de resposta (latência).
-4. Registrar a taxa de perda de pacotes observada durante cada sessão de coleta.
-5. Calcular e registrar o jitter (variação de latência) entre medições consecutivas.
-6. Armazenar cada medição coletada em um arquivo CSV.
-7. Oferecer suporte alternativo de armazenamento em banco de dados SQLite.
-8. Tratar erros de timeout e host inacessível sem interromper a execução contínua da coleta
-   (e também outras falhas inesperadas do processo, como permissão negada ou comando
-   não encontrado, registrando um aviso no terminal sem derrubar a coleta).
+A classe principal, PingCollector, executa medições em intervalos
+configuráveis, calcula jitter e perda acumulada e entrega cada resultado para
+um callback, que pode salvar os dados em CSV ou em outra forma de persistência.
 """
 
 import time

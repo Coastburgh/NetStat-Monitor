@@ -3,12 +3,8 @@ armazenamento/armazenamento.py
 
 Módulo responsável por persistir as medições coletadas pelo PingCollector.
 
-Cobre os requisitos funcionais:
-6. Armazenar cada medição coletada em um arquivo CSV.
-7. Oferecer suporte alternativo de armazenamento em banco de dados SQLite.
-
-Ambas as classes implementam a mesma interface (salvar_medicao), permitindo
-trocar o destino de armazenamento sem alterar o código do coletor.
+As classes implementam a mesma interface de armazenamento (salvar_medicao),
+permitindo trocar facilmente entre CSV e SQLite sem alterar a lógica de coleta.
 """
 
 import csv
