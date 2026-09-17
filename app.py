@@ -147,11 +147,32 @@ else:
         estatisticas = calcular_estatisticas_descritivas(df)
         perda_total = calcular_perda_pacotes_total(df)
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Amostras válidas", estatisticas["quantidade_amostras"])
-        c2.metric("Latência média", f"{estatisticas['media_ms']} ms")
-        c3.metric("Desvio padrão", f"{estatisticas['desvio_padrao_ms']} ms")
-        c4.metric("Perda total", f"{perda_total}%")
+        # Última leitura válida (instantânea), para diferenciar de latencia média
+        latencias_validas = df["latencia_ms"].dropna()
+        if not latencias_validas.empty:
+            latencia_atual = latencias_validas.iloc[-1]
+            delta_vs_media = (
+                latencia_atual - latencias_validas.iloc[-2]
+                if latencias_validas.iloc[-2] is not None else None
+            )
+        else:
+            latencia_atual = None
+            delta_vs_media = None
+
+        c0, c1, c2, c3, c4 = st.columns(5)
+        if latencia_atual is not None:
+            c0.metric(
+                "Latência instantânea",
+                f"{latencia_atual:.2f} ms",
+                delta=f"{delta_vs_media:+.2f} ms" if delta_vs_media is not None else None,
+                delta_color="inverse",  # menor que a média = verde (bom); maior = vermelho
+            )
+        else:
+            c0.metric("Latência instantânea", "—")
+        c1.metric("Latência média", f"{estatisticas['media_ms']} ms")
+        c2.metric("Desvio padrão", f"{estatisticas['desvio_padrao_ms']} ms")
+        c3.metric("Perda total", f"{perda_total}%")
+        c4.metric("Amostras válidas", estatisticas["quantidade_amostras"])
 
         col_a, col_b = st.columns(2)
         with col_a:
@@ -169,7 +190,7 @@ else:
             )
             st.plotly_chart(fig_jitter, use_container_width=True)
 
-        fig_perda = gerar_grafico_taxa_perda_pacotes(df, janela="5min", salvar_arquivo=False)
+        fig_perda = gerar_grafico_taxa_perda_pacotes(df, janela="1min", salvar_arquivo=False)
         st.plotly_chart(fig_perda, use_container_width=True)
 
     mostrar_dados()
