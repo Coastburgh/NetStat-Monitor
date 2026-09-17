@@ -14,6 +14,7 @@ import threading
 import streamlit as st
 
 from coletor.ping_collector import PingCollector
+from coletor.deteccao_rede import detectar_hosts_camadas
 from armazenamento.armazenamento import ArmazenamentoCSV
 from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
 from visualizacao.graficos import (
@@ -23,7 +24,6 @@ from visualizacao.graficos import (
 )
 
 PASTA_DADOS = "dados"
-HOSTS_PADRAO = ["192.168.11.254", "200.255.254.193","8.8.8.8"]
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
 st.title("NetStat Monitor")
@@ -37,12 +37,39 @@ if "coleta_ativa" not in st.session_state:
 # --- Barra lateral: configuração e controle da coleta ---
 st.sidebar.header("Configuração da coleta")
 
-hosts_selecionados = st.sidebar.multiselect(
-    "Hosts a monitorar", options=HOSTS_PADRAO, default=HOSTS_PADRAO
+# Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
+if "lan_gateway_input" not in st.session_state:
+    st.session_state.lan_gateway_input = ""
+    st.session_state.man_provedor_input = ""
+    st.session_state.wan_google_input = "8.8.8.8"
+
+if st.sidebar.button("Detectar automaticamente", disabled=st.session_state.coleta_ativa):
+    with st.spinner("Detectando hosts (gateway + traceroute, pode levar alguns segundos)..."):
+        detectados = detectar_hosts_camadas()
+    st.session_state.lan_gateway_input = detectados["lan_gateway"] or ""
+    st.session_state.man_provedor_input = detectados["man_provedor"] or ""
+    st.session_state.wan_google_input = detectados["wan_google"] or "8.8.8.8"
+    st.rerun()
+
+lan_gateway = st.sidebar.text_input(
+    "LAN — gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa
 )
-host_customizado = st.sidebar.text_input("Adicionar host customizado (opcional)")
-if host_customizado:
-    hosts_selecionados.append(host_customizado)
+man_provedor = st.sidebar.text_input(
+    "MAN — provedor (aproximado)", key="man_provedor_input", disabled=st.session_state.coleta_ativa
+)
+wan_google = st.sidebar.text_input(
+    "WAN — destino externo", key="wan_google_input", disabled=st.session_state.coleta_ativa
+)
+
+hosts_rotulados = {
+    rotulo: valor.strip()
+    for rotulo, valor in [
+        ("lan_gateway", lan_gateway),
+        ("man_provedor", man_provedor),
+        ("wan_google", wan_google),
+    ]
+    if valor.strip()
+}
 
 tipo_conexao = st.sidebar.selectbox("Tipo de conexão", ["wifi", "cabo"])
 intervalo = st.sidebar.number_input(
@@ -53,12 +80,12 @@ col_iniciar, col_parar = st.sidebar.columns(2)
 iniciar = col_iniciar.button("Iniciar", disabled=st.session_state.coleta_ativa)
 parar = col_parar.button("Parar", disabled=not st.session_state.coleta_ativa)
 
-if iniciar and hosts_selecionados:
-    for host in hosts_selecionados:
+if iniciar and hosts_rotulados:
+    for rotulo, host in hosts_rotulados.items():
         stop_event = threading.Event()
         coletor = PingCollector(host=host, intervalo_segundos=intervalo)
 
-        nome_arquivo = f"{PASTA_DADOS}/medicoes_{host.replace('.', '_')}_{tipo_conexao}.csv"
+        nome_arquivo = f"{PASTA_DADOS}/medicoes_{rotulo}_{tipo_conexao}.csv"
         armazenamento = ArmazenamentoCSV(caminho_arquivo=nome_arquivo)
 
         # O parâmetro default=armazenamento evita um erro clássico de closure em
@@ -73,8 +100,8 @@ if iniciar and hosts_selecionados:
             daemon=True,
         )
         thread.start()
-        st.session_state.threads[host] = thread
-        st.session_state.stop_events[host] = stop_event
+        st.session_state.threads[rotulo] = thread
+        st.session_state.stop_events[rotulo] = stop_event
 
     st.session_state.coleta_ativa = True
     st.rerun()

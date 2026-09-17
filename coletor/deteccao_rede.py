@@ -130,7 +130,7 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
         if sistema == "Windows":
             comando = ["tracert", "-h", str(max_saltos), "-w", "1000", destino]
         elif sistema == "Linux":
-            comando = ["tracepath", "-m", str(max_saltos), destino]
+            comando = ["tracepath", "-m", str(max_saltos), "-l", "28", destino]
         else:  # Darwin (macOS)
             comando = ["traceroute", "-m", str(max_saltos), "-w", "1", destino]
 
