@@ -4,8 +4,8 @@
 
 Project Integrator — Military Principles Faculty
 
-Team: Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique and Cid Mendes
-Advisor: Leonardo A. Portes
+Team: Eduardo Costa Borges, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique and Cid Mendes
+Professor: Leonardo A. Portes
 
 ## Overview
 

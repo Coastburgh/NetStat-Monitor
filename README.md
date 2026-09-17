@@ -4,10 +4,8 @@
 
 Projeto Integrador — Faculdade de Princípios Militares
 
-Equipe: Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique e Cid Mendes
-Orientador: Leonardo A. Portes
-
-## Visão geral
+Equipe: Eduardo Costa Borges, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique e Cid Mendes
+Professor: Leonardo A. Porte## Visão geral
 
 O NetStat Monitor é uma ferramenta para monitorar e analisar métricas de rede em tempo real, com foco em latência, jitter, perda de pacotes e comportamento de acesso à internet. O projeto coleta dados por ping em intervalos configuráveis, salva as medições em arquivos CSV e apresenta os resultados em um painel interativo em Streamlit.
 
