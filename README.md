@@ -1,111 +1,153 @@
 # NetStat Monitor
 
+[English version](README_EN.md)
+
 Projeto Integrador — Faculdade de Princípios Militares
 
-**Equipe:** Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique, Cid Mendes
-**Orientador:** Leonardo A. Portes
+Equipe: Eduardo F. Costa Borges, João Pedro Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique e Cid Mendes
+Orientador: Leonardo A. Portes
 
-## Descrição do Projeto
+## Visão geral
 
-O NetStat Monitor é um projeto de software voltado à coleta e análise estatística de métricas de rede, com o objetivo de caracterizar o comportamento de uma conexão de internet ao longo do tempo e identificar padrões e anomalias de desempenho. O sistema é desenvolvido em Python e realiza coletas periódicas de latência, perda de pacotes e jitter por meio de comandos de ping, armazenando cada medição em um arquivo CSV ou em um banco de dados SQLite, sempre acompanhada de um registro de data e hora.
+O NetStat Monitor é uma ferramenta para monitorar e analisar métricas de rede em tempo real, com foco em latência, jitter, perda de pacotes e comportamento de acesso à internet. O projeto coleta dados por ping em intervalos configuráveis, salva as medições em arquivos CSV e apresenta os resultados em um painel interativo em Streamlit.
 
-A coleta é planejada para ocorrer de forma contínua, em segundo plano, por vários dias e em condições variadas de uso — como redes Wi-Fi e cabeadas, em diferentes horários do dia — de modo a formar uma base de dados robusta o suficiente para sustentar uma análise estatística consistente. O tratamento de falhas comuns, como timeouts e hosts inacessíveis, é um ponto de atenção central do projeto, já que a coleta não pode ser interrompida por instabilidades momentâneas da rede.
+A documentação do projeto está disponível em português neste arquivo e em inglês em [README_EN.md](README_EN.md).
 
-Sobre os dados coletados, o sistema aplica técnicas de estatística descritiva (média, mediana, desvio padrão e percentis) e detecção de outliers pelo intervalo interquartil (IQR), para identificar picos anômalos de latência. Também é realizada uma análise de correlação entre o horário do dia e a latência observada, além de um teste de hipóteses (teste t) para comparar estatisticamente diferentes condições de rede, como Wi-Fi contra cabo ou horário de pico contra fora de pico.
+A ideia central do projeto é permitir que uma mesma sessão de coleta compare diferentes camadas de rede — LAN, MAN e WAN — com uma interface simples e sem depender de configuração manual de IPs em todos os casos. Para isso, o sistema também inclui detecção automática de gateway e do primeiro host externo do provedor.
 
-Os resultados são apresentados por meio de gráficos de série temporal e histogramas de distribuição gerados com matplotlib, com destaque visual para os outliers detectados, podendo evoluir para um painel interativo construído com Streamlit. Complementarmente, o projeto utiliza o Wireshark para capturar e inspecionar visualmente os pacotes ICMP gerados durante os testes de ping, agregando uma camada de análise qualitativa do tráfego à análise estatística quantitativa.
+## Mudanças de escopo e evolução do projeto
 
-> **Observação:** a comparação dos dados reais com um modelo teórico de filas (M/M/1) foi retirada do escopo confirmado do projeto neste momento, permanecendo como uma possível extensão a ser avaliada pelo grupo conforme o andamento do trabalho.
+Durante a construção do projeto, alguns planos iniciais foram ajustados:
 
-O projeto se conecta diretamente aos conteúdos das disciplinas de Estatística Aplicada à Informática e Introdução a Redes de Computadores, servindo tanto como exercício prático de programação quanto como estudo aplicado de análise de dados de rede.
+- a comparação com o modelo teórico M/M/1 foi retirada do escopo confirmado;
+- o painel Streamlit tornou-se parte central da solução, e não apenas uma extensão opcional;
+- a coleta foi estruturada para funcionar com múltiplos destinos simultaneamente em diferentes camadas de rede;
+- a detecção automática de rede passou a ser um recurso principal do sistema, especialmente para reduzir a necessidade de configuração manual.
 
-## Tecnologias
+Esses ajustes mantiveram a proposta principal do projeto, mas deixaram a solução mais prática, observável e útil para análise de desempenho real de rede.
 
-- **Linguagem:** Python
-- **Coleta de dados:** `subprocess`
-- **Armazenamento:** CSV ou SQLite
-- **Análise estatística:** `pandas`, `numpy`, `scipy`
-- **Visualização:** `matplotlib` e painel com `streamlit`
-- **Inspeção de tráfego:** Wireshark
+## Funcionalidades implementadas
 
-## Mapeamento com o Conteúdo das Disciplinas
+- coleta periódica de latência via ping;
+- cálculo de jitter e taxa de perda de pacotes acumulada;
+- suporte a múltiplos hosts simultâneos;
+- armazenamento em CSV e estrutura pronta para extensões em SQLite;
+- detecção automática do gateway padrão da rede local;
+- aproximação do primeiro host externo via traceroute;
+- interface web com Streamlit para iniciar/parar coleta e visualizar gráficos em tempo real;
+- análise estatística descritiva com média, mediana, desvio padrão e percentis;
+- identificação de outliers por IQR;
+- correlação entre horário do dia e latência.
 
-### Estatística Aplicada à Informática
+## Estrutura do projeto
 
-| Conteúdo do plano de ensino | Onde aparece no projeto |
-|---|---|
-| Medidas de posição e dispersão (média, mediana, desvio padrão) | Análise estatística dos dados de latência |
-| Coleta e organização de dados (tabelas e gráficos) | Coleta em CSV/SQLite e visualização com matplotlib |
-| Distribuições de probabilidade (Poisson, Normal) | Não coberto no momento — dependia da comparação com Teoria das Filas, atualmente fora do escopo confirmado |
-| Correlação | Correlação entre horário do dia e latência |
-| Testes de hipóteses (Z, t) | Comparação estatística entre condições de rede (teste t) |
+- app.py — painel principal em Streamlit;
+- coletor/ — módulos de coleta e detecção de rede;
+- armazenamento/ — persistência dos dados coletados;
+- analise/ — cálculo estatístico e identificação de padrões;
+- visualizacao/ — gráficos e visualizações;
+- dados/ — arquivos CSV gerados pelas coletas;
+- scripts/ — utilitários de apoio e geração de dados simulados.
 
-### Introdução a Redes de Computadores
+## Requisitos
 
-| Conteúdo do plano de ensino | Onde aparece no projeto |
-|---|---|
-| Comandos de diagnóstico (ping, traceroute, ipconfig) | Base do coletor de dados |
-| Camadas de transporte (TCP/UDP) | Extensão opcional — comparação de desempenho entre TCP e UDP |
-| Análise de pacotes com Wireshark | Captura e inspeção do tráfego ICMP gerado pelo ping |
-| Protocolos (ICMP) | Implícito na coleta, citado explicitamente no relatório final |
+- Python 3.10 ou superior;
+- pip;
+- ambiente virtual recomendado.
 
-## Status
-### Configuração e Estrutura do Projeto
+Dependências principais:
 
-- [x] Repositório Git criado
-- [x] Ambiente virtual (venv) configurado
-- [x] `requirements.txt`
-- [x] Estrutura de pastas (`coletor/`, `armazenamento/`, `analise/`, `visualizacao/`, `dados/`)
-- [x] `.gitignore` configurado (venv, cache, dados coletados)
-- [x] `README.md`
-- [x] Glossário de termos técnicos
-- [x] Documentos entregues ao professor: objetivo + integrantes, escopo do projeto, Etapa 02 (descrição, persona, requisitos funcionais)
+- streamlit
+- pandas
+- numpy
+- scipy
+- plotly
+- matplotlib
 
-### Coleta de Dados
+O arquivo requirements.txt contém a lista completa das dependências do projeto.
 
-- [x] Configurar host de destino (**req. 1**)
-- [x] Definir intervalo entre coletas (**req. 2**)
-- [x] Coleta periódica de latência via ping (**req. 3**)
-- [x] Registrar perda de pacotes (**req. 4**)
-- [x] Calcular jitter (**req. 5**)
-- [x] Tratamento de erros/timeouts sem interromper a coleta (**req. 8**)
-- [x] Execução contínua em segundo plano (**req. 9**)
-- [x] Coleta simultânea de múltiplos destinos via threading (**req. 10**)
-- [x] Rótulo de sessão (Wi-Fi / Cabo) para permitir comparação futura
-- [ ] Coleta de dados reais em andamento (dias de Wi-Fi e de cabo)
+## Instalação
 
-### Armazenamento de Dados
+1. Clone o repositório:
 
-- [x] Armazenamento em CSV (**req. 6**)
-- [x] Suporte alternativo em SQLite (**req. 7**)
+   git clone <url-do-repositorio>
 
-### Análise Estatística
+2. Entre na pasta do projeto:
 
-- [x] Estatística descritiva: média, mediana, desvio padrão, percentis (**req. 11**)
-- [ ] ~~Detecção de outliers por z-score (**req. 12**)~~
-- [x] Detecção de outliers por IQR (**req. 13**)
-- [x] Correlação entre horário do dia e latência (**req. 14**)
-- [ ] ~~Teste de hipóteses / teste t — Wi-Fi vs. Cabo (**req. 15**)~~
+   cd NetStat-Monitor
 
-### Visualização e Interface
+3. Crie e ative um ambiente virtual:
 
-- [x] Gráficos de série temporal (**req. 16**)
-- [ ] Histogramas de distribuição (**req. 17**)
-- [ ] Destaque visual de outliers nos gráficos (**req. 18**)
-- [ ] Painel interativo com Streamlit (**req. 19**)
+   python -m venv venv
+   .\venv\Scripts\Activate.ps1
 
-### Relatório Final
+4. Instale as dependências:
 
-- [ ] Geração de relatório consolidado com estatísticas, gráficos e conclusões (**req. 20**)
+   pip install -r requirements.txt
 
-### Ferramentas de Apoio ao Desenvolvimento (fora da contagem de requisitos)
+## Execução
 
-- [x] Script gerador de dados sintéticos, para testar a análise sem depender de dias de coleta real
+### Painel Streamlit
 
-### Fora do Escopo Confirmado
+Para iniciar a interface do projeto:
 
-- [ ] *(incerto, em avaliação pelo grupo)* Comparação com modelo teórico de Teoria das Filas (M/M/1)
-- Comparação de desempenho entre TCP e UDP
-- Modelos de machine learning para previsão ou detecção de anomalias
-- Monitoramento de redes de terceiros
-- Aplicativo mobile ou GUI desktop tradicional
+   streamlit run app.py
+
+Na interface, você pode:
+
+- informar os hosts das camadas LAN, MAN e WAN;
+- detectar automaticamente o gateway e o primeiro host externo;
+- iniciar e interromper uma coleta;
+- visualizar gráficos de latência, jitter e perda de pacotes.
+
+### Detecção automática de rede
+
+Para testar apenas a detecção de hosts das camadas de rede:
+
+   python -m coletor.deteccao_rede
+
+### Coleta direta
+
+O módulo de coleta também pode ser executado diretamente para testes rápidos:
+
+   python -m coletor.ping_collector
+
+## Fluxo de uso típico
+
+1. o usuário abre a aplicação em Streamlit;
+2. o sistema permite preencher os hosts de cada camada ou detectar automaticamente;
+3. a coleta se inicia em múltiplas threads;
+4. as medições são gravadas em CSV;
+5. gráficos e indicadores estatísticos são atualizados em tempo real.
+
+## Status atual do projeto
+
+### Implementado
+
+- [x] coleta periódica via ping;
+- [x] monitoramento de múltiplos destinos;
+- [x] tratamento de falhas e timeouts;
+- [x] armazenamento em CSV;
+- [x] detecção automática de gateway e provedor;
+- [x] painel Streamlit;
+- [x] estatísticas descritivas;
+- [x] detecção de outliers por IQR;
+- [x] correlação entre horário e latência;
+- [x] estrutura de visualização com gráficos.
+
+### Ainda pendente ou em abertura
+
+- [ ] geração automatizada de relatório consolidado;
+- [ ] coleta extensiva em múltiplos dias para validação real;
+- [ ] comparações mais aprofundadas entre Wi-Fi e cabo;
+- [ ] refinamento de visualizações e exportação de relatórios.
+
+## Observações importantes
+
+- o projeto foi pensado como ferramenta prática de diagnóstico de rede, e não como um substituto de ferramentas de análise de rede especialistas;
+- a camada MAN é tratada como uma aproximação baseada em traceroute, e não como identificação exata do provedor;
+- a detecção de gateway e primeiro host externo é útil como suporte, mas o usuário sempre pode ajustar manualmente os valores da coleta.
+
+## Licença
+
+Este projeto é destinado a fins acadêmicos e de desenvolvimento de software em contexto universitário.
