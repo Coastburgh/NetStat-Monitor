@@ -2,7 +2,7 @@
 
 [Versão em português](README.md)
 
-Project Integrator — Military Principles Faculty
+Semester Project — Faculdade de Princípios Militares
 
 Team: Eduardo Costa Borges, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique and Cid Mendes
 Professor: Leonardo A. Portes
