@@ -4,7 +4,7 @@
 
 Semester Project 2026/2— Faculdade de Princípios Militares
 
-Team: Eduardo Costa Borges, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique and Cid Mendes
+Team: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória and Paulo Henrique
 Professor: Leonardo A. Portes
 
 ## Overview
