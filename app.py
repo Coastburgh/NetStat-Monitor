@@ -147,25 +147,26 @@ else:
         estatisticas = calcular_estatisticas_descritivas(df)
         perda_total = calcular_perda_pacotes_total(df)
 
-        # Última leitura válida (instantânea), para diferenciar de latencia média
+        # Última leitura válida (instantânea), comparada com a leitura
+        # imediatamente anterior (não mais com a média da sessão).
         latencias_validas = df["latencia_ms"].dropna()
-        if not latencias_validas.empty:
+        if len(latencias_validas) >= 2:
             latencia_atual = latencias_validas.iloc[-1]
-            delta_vs_media = (
-                latencia_atual - latencias_validas.iloc[-2]
-                if latencias_validas.iloc[-2] is not None else None
-            )
+            delta_vs_anterior = latencia_atual - latencias_validas.iloc[-2]
+        elif len(latencias_validas) == 1:
+            latencia_atual = latencias_validas.iloc[-1]
+            delta_vs_anterior = None  # não há leitura anterior para comparar ainda
         else:
             latencia_atual = None
-            delta_vs_media = None
+            delta_vs_anterior = None
 
         c0, c1, c2, c3, c4 = st.columns(5)
         if latencia_atual is not None:
             c0.metric(
                 "Latência instantânea",
                 f"{latencia_atual:.2f} ms",
-                delta=f"{delta_vs_media:+.2f} ms" if delta_vs_media is not None else None,
-                delta_color="inverse",  # menor que a média = verde (bom); maior = vermelho
+                delta=f"{delta_vs_anterior:+.2f} ms" if delta_vs_anterior is not None else None,
+                delta_color="inverse",  # menor que a leitura anterior = verde (bom); maior = vermelho
             )
         else:
             c0.metric("Latência instantânea", "—")
