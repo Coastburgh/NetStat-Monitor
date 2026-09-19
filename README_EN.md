@@ -2,9 +2,7 @@
 
 [Versão em português](README.md)
 
-Semester Project — Faculdade de Princípios Militares
-
-Courses: Estatística Aplicada à Informática (Applied Statistics for Computing) and Introdução a Redes de Computadores (Introduction to Computer Networks)
+Semester Project 2026/2— Faculdade de Princípios Militares
 
 Team: Eduardo Costa Borges, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória, Paulo Henrique and Cid Mendes
 Professor: Leonardo A. Portes
@@ -57,28 +55,6 @@ The connection type is not a CSV column: it is recorded in the file name, using 
 
 Example: `medicoes_lan_gateway_wifi.csv`. The layer labels used are `lan_gateway`, `man_provedor` and `wan_google`; the stored session labels are `wifi` and `cabo`, displayed as "Wi-Fi" and "Cabo". The `tipo_conexao` column is reconstructed when the data is loaded, from the file name suffix.
 
-Hosts used in the reference collections:
-
-| Host | Layer | Description |
-|---|---|---|
-| `172.20.10.1` | LAN | Local gateway (mobile hotspot, in the test environment) |
-| First public hop via traceroute | MAN | Approximation of the provider's infrastructure |
-| `8.8.8.8` | WAN | Google DNS |
-| `1.1.1.1` | WAN (alternative) | Cloudflare DNS |
-
-## Relation to course content
-
-| Syllabus topic | Where it appears in the project |
-|---|---|
-| Measures of position and dispersion | Descriptive statistics (req. 11) |
-| Probability distributions | Not covered — depended on the queueing theory comparison, currently out of confirmed scope |
-| Correlation | Correlation between time of day and latency (req. 14) |
-| Hypothesis testing (Z, t) | Both removed from confirmed scope — z-score due to masking (req. 12); t-test (req. 15) not implemented |
-| Network types (LAN, MAN, WAN) | Hosts organized and automatically detected by layer |
-| Diagnostic commands (ping, traceroute, ipconfig) | Basis of the collector and of automatic host detection |
-| Protocols (ICMP) | Implicit in ping-based collection |
-| Packet analysis with Wireshark | Complementary manual activity, not integrated into the codebase |
-
 ## Methodological decisions
 
 - **IQR for outliers, no Z-score.** The Z-score was evaluated and removed because it assumes a normal distribution and suffers from masking: the outliers themselves inflate the standard deviation and escape detection. Network latency distributions are skewed with a long right tail, which makes IQR the more robust and appropriate choice.
@@ -120,7 +96,7 @@ Main dependencies: streamlit, pandas, numpy, scipy and plotly. The `requirements
 
 1. Clone the repository:
 
-       git clone <repository-url>
+       git clone https://github.com/Coastburgh/NetStat-Monitor.git
 
 2. Enter the project folder:
 
