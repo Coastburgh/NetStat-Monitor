@@ -162,7 +162,7 @@ def detectar_hosts_camadas(destino_wan: str = "8.8.8.8") -> dict:
     return {
         "lan_gateway": gateway,
         "man_provedor": primeiro_externo,
-        "wan_google": destino_wan,
+        "wan_destino": destino_wan,
     }
 
 

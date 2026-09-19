@@ -42,14 +42,14 @@ st.sidebar.header("Configuração da coleta")
 if "lan_gateway_input" not in st.session_state:
     st.session_state.lan_gateway_input = ""
     st.session_state.man_provedor_input = ""
-    st.session_state.wan_google_input = "8.8.8.8"
+    st.session_state.wan_destino_input = "8.8.8.8"
 
 if st.sidebar.button("Detectar automaticamente", disabled=st.session_state.coleta_ativa):
     with st.spinner("Detectando hosts (gateway + traceroute, pode levar alguns segundos)..."):
         detectados = detectar_hosts_camadas()
-    st.session_state.lan_gateway_input = detectados["lan_gateway"] or ""
-    st.session_state.man_provedor_input = detectados["man_provedor"] or ""
-    st.session_state.wan_google_input = detectados["wan_google"] or "8.8.8.8"
+    st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
+    st.session_state.man_provedor_input = detectados.get("man_provedor") or ""
+    st.session_state.wan_destino_input = detectados.get("wan_destino") or "8.8.8.8"
     st.rerun()
 
 lan_gateway = st.sidebar.text_input(
@@ -58,16 +58,16 @@ lan_gateway = st.sidebar.text_input(
 man_provedor = st.sidebar.text_input(
     "MAN — provedor (aproximado)", key="man_provedor_input", disabled=st.session_state.coleta_ativa
 )
-wan_google = st.sidebar.text_input(
-    "WAN — destino externo", key="wan_google_input", disabled=st.session_state.coleta_ativa
+wan_destino = st.sidebar.text_input(
+    "WAN — destino externo", key="wan_destino_input", disabled=st.session_state.coleta_ativa
 )
 
 hosts_rotulados = {
     rotulo: valor.strip()
     for rotulo, valor in [
-        ("lan_gateway", lan_gateway),
-        ("man_provedor", man_provedor),
-        ("wan_google", wan_google),
+        ("lan", lan_gateway),
+        ("man", man_provedor),
+        ("wan", wan_destino),
     ]
     if valor.strip()
 }
@@ -86,7 +86,8 @@ if iniciar and hosts_rotulados:
         stop_event = threading.Event()
         coletor = PingCollector(host=host, intervalo_segundos=intervalo)
 
-        nome_arquivo = f"{PASTA_DADOS}/medicoes_{rotulo}_{tipo_conexao}.csv"
+        endereco = host.strip()
+        nome_arquivo = f"{PASTA_DADOS}/medicoes_{rotulo}_{endereco}_{tipo_conexao}.csv"
         armazenamento = ArmazenamentoCSV(caminho_arquivo=nome_arquivo)
 
         # O parâmetro default=armazenamento evita um erro clássico de closure em
