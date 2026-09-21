@@ -12,38 +12,6 @@ import re
 import ipaddress
 
 
-def _extrair_ip_v4(texto: str) -> str | None:
-    """Extrai o primeiro IPv4 válido de um texto, preferindo endereços de gateway."""
-    if not texto:
-        return None
-
-    # Prioriza linhas que mencionam gateway, que normalmente contêm o valor real da rota padrão.
-    for linha in texto.splitlines():
-        if "default gateway" in linha.lower() or "gateway padrão" in linha.lower() or "gateway" in linha.lower():
-            match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})", linha)
-            if match:
-                ip = match.group(1)
-                try:
-                    ipaddress.ip_address(ip)
-                    if ip.startswith("127."):
-                        continue
-                    return ip
-                except ValueError:
-                    continue
-
-    # Fallback geral: tenta capturar o primeiro IPv4 válido de qualquer parte do texto.
-    for match in re.finditer(r"(\d{1,3}(?:\.\d{1,3}){3})", texto):
-        ip = match.group(1)
-        try:
-            ipaddress.ip_address(ip)
-            if not ip.startswith("127."):
-                return ip
-        except ValueError:
-            continue
-
-    return None
-
-
 def detectar_gateway() -> str:
     """
     Retorna o IP do gateway padrão (roteador) da rede atual, lendo a
@@ -54,23 +22,14 @@ def detectar_gateway() -> str:
 
     try:
         if sistema == "Windows":
-            # Usa a rota IPv4 padrão diretamente, que é mais robusta do que
-            # o 'ipconfig' quando a interface só expõe IPv6 ou o valor está em branco.
-            powershell_cmd = [
-                "powershell",
-                "-NoProfile",
-                "-Command",
-                "(Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' | Select-Object -ExpandProperty NextHop -First 1).ToString()",
-            ]
-            resultado = subprocess.run(powershell_cmd, capture_output=True, text=True, timeout=10)
-            gateway = (resultado.stdout or "").strip()
-            if gateway and gateway != "On-link":
-                return gateway
-
-            resultado = subprocess.run(["ipconfig"], capture_output=True, text=True, timeout=5)
-            gateway = _extrair_ip_v4(resultado.stdout)
-            if gateway:
-                return gateway
+            resultado = subprocess.run(
+                ["ipconfig"], capture_output=True, text=True, timeout=5
+            )
+            for linha in resultado.stdout.splitlines():
+                if "Default Gateway" in linha or "Gateway Padrão" in linha:
+                    match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", linha)
+                    if match:
+                        return match.group(1)
         else:
             resultado = subprocess.run(
                 ["ip", "route", "show", "default"],
@@ -85,34 +44,55 @@ def detectar_gateway() -> str:
     return None
 
 
-def _eh_ip_privado(ip: str) -> bool:
-    """True se o IP pertence a uma faixa privada/reservada (não roteável na internet)."""
+def _extrair_ips_da_linha(linha: str) -> list:
+    """
+    Extrai possíveis IPv4 de uma linha de traceroute/tracepath, cobrindo
+    dois formatos:
+    1. IP puro: '192.168.1.1'
+    2. IP codificado em hostname de DNS reverso, com hífens no lugar de
+       pontos — prática comum de provedores brasileiros, ex.:
+       '177-107-178-45.brcentral.net.br' representa 177.107.178.45.
+       Sem isso, esses saltos são invisíveis para a detecção, mesmo
+       quando são exatamente o salto público que procuramos.
+    """
+    candidatos = re.findall(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", linha)
+
+    for match in re.finditer(r"\b(\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3})\b", linha):
+        candidatos.append(match.group(1).replace("-", "."))
+
+    return candidatos
+
+
+def _eh_ip_publico(ip: str) -> bool:
+    """
+    True apenas se o IP é genuinamente roteável na internet pública.
+
+    Usa is_global em vez de checar apenas 'not is_private': o atributo
+    is_private do Python segue estritamente a RFC 1918 (10.x, 172.16-31.x,
+    192.168.x) e NÃO reconhece a faixa 100.64.0.0/10 (CGNAT, RFC 6598),
+    usada internamente por operadoras e redes corporativas grandes para
+    NAT em larga escala. Um IP nessa faixa não é 'privado' pela definição
+    estrita, mas também não é público de verdade — is_global cobre os
+    dois casos corretamente.
+    """
     try:
-        return ipaddress.ip_address(ip).is_private
+        return ipaddress.ip_address(ip).is_global
     except ValueError:
-        return True  # não é um IP válido; trata como "não conta"
-
-
-def _extrair_primeiro_ip_publico(texto: str, destino: str | None = "8.8.8.8") -> str | None:
-    """Retorna o primeiro IP público real encontrado em um traceroute/traceroute-like."""
-    destino_normalizado = destino or ""
-    for linha in texto.splitlines():
-        ips = re.findall(r"\d{1,3}(?:\.\d{1,3}){3}", linha)
-        for ip in ips:
-            if destino_normalizado and ip == destino_normalizado:
-                continue
-            if _eh_ip_privado(ip):
-                continue
-            return ip
-    return None
+        return False  # não é um IP válido; não conta como público
 
 
 def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6) -> str:
     """
     Executa um traceroute até 'destino' e retorna o IP do primeiro salto
-    já fora da rede local (o primeiro IP público no caminho) — tipicamente
-    o primeiro equipamento do provedor de internet, usado como aproximação
-    da camada MAN.
+    já fora da rede local (o primeiro IP genuinamente público no caminho)
+    — tipicamente o primeiro equipamento do provedor de internet, usado
+    como aproximação da camada MAN.
+
+    Em redes corporativas ou universitárias com vários estágios de
+    infraestrutura interna (incluindo CGNAT), o IP público real pode
+    aparecer bem mais tarde no caminho do que em uma rede doméstica
+    simples. Se isso ultrapassar max_saltos, a detecção retorna None —
+    aumentar max_saltos pode ajudar nesses casos.
 
     Pode retornar None mesmo em redes normais: alguns provedores não
     respondem a pacotes de saltos intermediários, o que é uma limitação
@@ -130,7 +110,7 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
         if sistema == "Windows":
             comando = ["tracert", "-h", str(max_saltos), "-w", "1000", destino]
         elif sistema == "Linux":
-            comando = ["tracepath", "-m", str(max_saltos), "-l", "28", destino]
+            comando = ["tracepath", "-m", str(max_saltos), destino]
         else:  # Darwin (macOS)
             comando = ["traceroute", "-m", str(max_saltos), "-w", "1", destino]
 
@@ -139,7 +119,12 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
         print(f"Aviso: falha ao executar traceroute/tracepath — {type(erro).__name__}: {erro}")
         return None
 
-    return _extrair_primeiro_ip_publico(resultado.stdout, destino=destino)
+    for linha in resultado.stdout.splitlines():
+        for ip in _extrair_ips_da_linha(linha):
+            if _eh_ip_publico(ip):
+                return ip
+
+    return None
 
 
 def detectar_hosts_camadas(destino_wan: str = "8.8.8.8") -> dict:
@@ -149,20 +134,21 @@ def detectar_hosts_camadas(destino_wan: str = "8.8.8.8") -> dict:
     hosts monitorados com significado explícito, em vez de IPs soltos.
 
     - lan_gateway: o roteador da rede local (via detectar_gateway)
-    - man_provedor: o primeiro salto público no caminho até destino_wan,
-      uma APROXIMAÇÃO da infraestrutura do provedor — pode vir como None
+    - man_provedor: o primeiro salto genuinamente público no caminho até
+      destino_wan, uma APROXIMAÇÃO da infraestrutura do provedor — pode
+      vir como None
     - wan_google: o destino externo fixo, fornecido diretamente
 
     Um valor None significa que a interface deve permitir preenchimento
     manual — a detecção é um atalho, nunca uma dependência obrigatória.
     """
     gateway = detectar_gateway()
-    primeiro_externo = detectar_primeiro_host_externo(destino=destino_wan)
+    primeiro_externo = detectar_primeiro_host_externo(destino=destino_wan) if gateway else None
 
     return {
         "lan_gateway": gateway,
         "man_provedor": primeiro_externo,
-        "wan_destino": destino_wan,
+        "wan_google": destino_wan,
     }
 
 
