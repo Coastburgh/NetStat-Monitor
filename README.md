@@ -1,11 +1,15 @@
-# NetStat Monitor
-
-[English version](README_EN.md)
+<p align="center">
+    <img width="455" height="100" align="center" alt="netstat-logo" src="https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7" />
+<p/>
 
 Projeto Integrador 2026/2 — Faculdade de Princípios Militares
 
 Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo
 Professor: Leonardo A. Portes
+
+[English version](README_EN.md)
+
+---
 
 ## Visão geral
 
@@ -14,6 +18,8 @@ O NetStat Monitor é uma ferramenta para monitorar e analisar métricas de rede 
 A documentação do projeto está disponível em português neste arquivo e em inglês em [README_EN.md](README_EN.md).
 
 A ideia central é permitir que uma mesma sessão de coleta compare diferentes camadas de rede (LAN, MAN e WAN) sem depender de configuração manual de IPs em todos os casos. Para isso, o sistema inclui detecção automática do gateway e do primeiro host externo do provedor. Essa organização por camadas conecta o projeto diretamente ao tópico "Tipos de redes (LAN, MAN, WAN)" da ementa de Introdução a Redes de Computadores.
+
+
 
 ## Mudanças de escopo e evolução do projeto
 
