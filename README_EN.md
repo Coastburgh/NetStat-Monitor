@@ -1,11 +1,15 @@
-# NetStat Monitor
-
-[Versão em português](README.md)
+<p align="center">
+    <img width="455" height="100" align="center" alt="netstat-logo" src="https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7" />
+<p/>
 
 Semester Project 2026/2— Faculdade de Princípios Militares
 
 Team: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória and Paulo Henrique
 Professor: Leonardo A. Portes
+
+[Versão em português](README.md)
+
+---
 
 ## Overview
 
