@@ -72,7 +72,7 @@ hosts_rotulados = {
     if valor.strip()
 }
 
-tipo_conexao = st.sidebar.selectbox("Tipo de conexão", ["wifi", "cabo"])
+tipo_conexao = st.sidebar.selectbox("Tipo de conexão", ["WiFi", "Ethernet"])
 intervalo = st.sidebar.number_input(
     "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0
 )
@@ -162,19 +162,19 @@ else:
             delta_vs_anterior = None
 
         c0, c1, c2, c3, c4 = st.columns(5)
-        if latencia_atual is not None:
+        if latencia_atual is not None and st.session_state.coleta_ativa is True:
             c0.metric(
-                "Latência instantânea",
+                "Latência Instantânea",
                 f"{latencia_atual:.2f} ms",
                 delta=f"{delta_vs_anterior:+.2f} ms" if delta_vs_anterior is not None else None,
                 delta_color="inverse",  # menor que a leitura anterior = verde (bom); maior = vermelho
             )
         else:
-            c0.metric("Latência instantânea", "—")
-        c1.metric("Latência média", f"{estatisticas['media_ms']} ms")
-        c2.metric("Desvio padrão", f"{estatisticas['desvio_padrao_ms']} ms")
-        c3.metric("Perda total", f"{perda_total}%")
-        c4.metric("Amostras válidas", estatisticas["quantidade_amostras"])
+            c0.metric("Latência Instantânea", "—")
+        c1.metric("Latência Média", f"{estatisticas['media_ms']} ms")
+        c2.metric("Desvio Padrão", f"{estatisticas['desvio_padrao_ms']} ms")
+        c3.metric("Perda de Pacotes Total", f"{perda_total}%")
+        c4.metric("Amostras Válidas", estatisticas["quantidade_amostras"])
 
         col_a, col_b = st.columns(2)
         with col_a:
