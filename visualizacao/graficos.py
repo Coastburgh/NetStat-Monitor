@@ -85,7 +85,7 @@ def gerar_grafico_serie_temporal(
         hovertemplate="%{x|%d/%m %H:%M}<br>%{y:.2f}<extra></extra>",
     ))
 
-    subtitulo = f" (média por {agregacao})" if agregacao else " (dados brutos)"
+    subtitulo = f" (média em {agregacao})" if agregacao else " (dados brutos)"
     fig.update_layout(
         title=dict(text=titulo + subtitulo, font=dict(size=18)),
         xaxis_title="Data e hora",

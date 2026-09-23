@@ -27,7 +27,6 @@ from visualizacao.graficos import (
 PASTA_DADOS = "dados"
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
-st.title("NetStat Monitor")
 
 # --- Estado da sessão: sobrevive entre reruns do Streamlit, enquanto a aba do navegador estiver aberta ---
 if "coleta_ativa" not in st.session_state:
@@ -36,7 +35,10 @@ if "coleta_ativa" not in st.session_state:
     st.session_state.stop_events = {}
 
 # --- Barra lateral: configuração e controle da coleta ---
+st.sidebar.image("https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7")
+st.sidebar.divider()
 st.sidebar.header("Configuração da coleta")
+st.sidebar.text("Informe os endereços à monitorar")
 
 # Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
 if "lan_gateway_input" not in st.session_state:
@@ -44,7 +46,7 @@ if "lan_gateway_input" not in st.session_state:
     st.session_state.man_provedor_input = ""
     st.session_state.wan_destino_input = "8.8.8.8"
 
-if st.sidebar.button("Detectar automaticamente", disabled=st.session_state.coleta_ativa):
+if st.sidebar.button("Detecção Automática", disabled=st.session_state.coleta_ativa):
     with st.spinner("Detectando hosts (gateway + traceroute, pode levar alguns segundos)..."):
         detectados = detectar_hosts_camadas()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
@@ -173,7 +175,7 @@ else:
             c0.metric("Latência Instantânea", "—")
         c1.metric("Latência Média", f"{estatisticas['media_ms']} ms")
         c2.metric("Desvio Padrão", f"{estatisticas['desvio_padrao_ms']} ms")
-        c3.metric("Perda de Pacotes Total", f"{perda_total}%")
+        c3.metric("Perda Total de Pacotes", f"{perda_total}%")
         c4.metric("Amostras Válidas", estatisticas["quantidade_amostras"])
 
         col_a, col_b = st.columns(2)
@@ -188,7 +190,7 @@ else:
             fig_jitter = gerar_grafico_serie_temporal(
                 df, coluna="jitter_ms", titulo="Jitter",
                 rotulo_eixo_y="Jitter (ms)", agregacao="1min",
-                salvar_arquivo=False,
+                salvar_arquivo=False, cor_grafico="#00ABC2"
             )
             st.plotly_chart(fig_jitter, use_container_width=True)
 
