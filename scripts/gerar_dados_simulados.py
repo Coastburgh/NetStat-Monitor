@@ -105,10 +105,10 @@ if __name__ == "__main__":
 
     cenarios = [
         # (host, arquivo, latência base, variação, tipo de conexão)
-        ("8.8.8.8", "dados/medicoes_8_8_8_8_wifi.csv", 15.0, 4.0),
-        ("8.8.8.8", "dados/medicoes_8_8_8_8_cabo.csv", 9.0, 2.0),  # cabo: mais estável e rápido
-        ("1.1.1.1", "dados/medicoes_1_1_1_1_wifi.csv", 12.0, 3.5),
-        ("172.20.10.1", "dados/medicoes_172_20_10_1_wifi.csv", 3.0, 1.0),
+        ("8.8.8.8", "dados/medicoes_wan_8.8.8.8_wifi.csv", 15.0, 4.0),
+        ("8.8.8.8", "dados/medicoes_wan_8.8.8.8_ethernet.csv", 9.0, 2.0),  # ethernet: mais estável e rápido
+        ("1.1.1.1", "dados/medicoes_wan_1.1.1.1_wifi.csv", 12.0, 3.5),
+        ("172.20.10.1", "dados/medicoes_lan_172.20.10.1_wifi.csv", 3.0, 1.0),
     ]
 
     for host, caminho, base, variacao in cenarios:
