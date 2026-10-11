@@ -28,7 +28,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - a comparação com o modelo teórico M/M/1 foi retirada do escopo confirmado, sem definição sobre uma implementação futura;
 - o painel Streamlit tornou-se parte central da solução, e não apenas uma extensão opcional — inclusive com controle completo de iniciar/parar a coleta pelo navegador, não só visualização;
 - o `main.py`, ponto de entrada original via terminal, foi descontinuado: sua lógica de coleta multi-host foi absorvida pelo `app.py`, eliminando a duplicação entre os dois pontos de entrada que existiu por um período do projeto;
-- a coleta foi estruturada para funcionar com múltiplos destinos simultâneos em diferentes camadas de rede (LAN/MAN/WAN), com nomeação de arquivo por rótulo de camada em vez de por IP;
+- a coleta foi estruturada para funcionar com múltiplos destinos simultâneos em diferentes camadas de rede (LAN/MAN/WAN), com nomeação de arquivo por rótulo de camada, host e tipo de conexão;
 - a detecção automática de rede passou a ser um recurso principal, para reduzir a configuração manual;
 - os histogramas de distribuição (requisito 17) e o teste de hipóteses / teste t (requisito 15) foram avaliados e **removidos definitivamente do escopo confirmado** do projeto — não estão em andamento nem previstos para retomada;
 - o armazenamento principal permaneceu em CSV; o suporte alternativo em SQLite (requisito 7) foi implementado e testado como módulo (`ArmazenamentoSQLite`), mas não está em uso na pipeline ativa do `app.py`, que utiliza CSV exclusivamente;
@@ -57,9 +57,9 @@ Cada linha de CSV representa uma medição, com o seguinte esquema:
 
 O tipo de conexão não é uma coluna do CSV: ele é registrado no nome do arquivo, no formato:
 
-    dados/medicoes_{rotulo_camada}_{rotulo_sessao}.csv
+    dados/medicoes_{rotulo_camada}_{host}_{rotulo_sessao}.csv
 
-Exemplo: `medicoes_lan_gateway_wifi.csv`. Os rótulos de camada utilizados são `lan_gateway`, `man_provedor` e `wan_google`; os rótulos de sessão armazenados são `wifi` e `cabo`, exibidos como "Wi-Fi" e "Cabo". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
+Exemplo: `medicoes_wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `man` e `wan`; os rótulos de sessão armazenados são `wifi` e `ethernet`, exibidos como "Wi-Fi" e "Ethernet". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
 
 ## Relação com o conteúdo das disciplinas
 
@@ -78,7 +78,7 @@ Exemplo: `medicoes_lan_gateway_wifi.csv`. Os rótulos de camada utilizados são 
 
 - **Outliers por IQR, sem Z-score.** O Z-score foi avaliado e removido por pressupor distribuição normal e por sofrer mascaramento: os próprios outliers inflam o desvio padrão e deixam de ser detectados. Distribuições de latência de rede são assimétricas, com cauda longa à direita, o que torna o IQR mais robusto e adequado.
 - **Soluções simples primeiro.** Complexidade é adiada quando não é necessária de imediato (por exemplo, ainda não há coluna de tipo de erro no CSV).
-- **Teste t removido do escopo.** A comparação estatística entre grupos (ex.: Wi-Fi vs. cabo) por teste t foi avaliada, mas não faz mais parte do escopo confirmado do projeto.
+- **Teste t removido do escopo.** A comparação estatística entre grupos (ex.: Wi-Fi vs. Ethernet) por teste t foi avaliada, mas não faz mais parte do escopo confirmado do projeto.
 - **Agregação apenas na visualização.** Médias por minuto suavizam os gráficos de série temporal, mas nunca são usadas para detecção de outliers — agregar antes de detectar outliers mascararia picos reais.
 - **Perda de pacotes por janela, não cumulativa.** A taxa de perda exibida nos gráficos é recalculada por janela de tempo, evitando que o contador cumulativo (que reinicia a cada execução do coletor) esconda picos de instabilidade pontuais.
 
@@ -196,7 +196,7 @@ Para testes rápidos do módulo de coleta:
 - [ ] destaque visual de outliers diretamente nos gráficos de série temporal (req. 18);
 - [ ] geração automatizada de relatório consolidado (req. 20);
 - [ ] coleta extensiva em múltiplos dias para validação real;
-- [ ] comparação mais aprofundada entre Wi-Fi e cabo;
+- [ ] comparação mais aprofundada entre Wi-Fi e Ethernet;
 - [ ] refinamento das visualizações e exportação de relatórios;
 - [ ] captura e inspeção de tráfego com Wireshark (atividade manual, planejada para a etapa de relatório final).
 

@@ -4,7 +4,7 @@
 
 Semester Project 2026/2— Faculdade de Princípios Militares
 
-Team: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória and Paulo Henrique
+Team: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória and Paulo Carrijo
 Professor: Leonardo A. Portes
 
 [Versão em português](README.md)
@@ -26,7 +26,7 @@ During development, some initial plans were revised:
 - the comparison with the theoretical M/M/1 queue model was removed from the confirmed scope, with no decision on a future implementation;
 - the Streamlit dashboard became a central part of the solution instead of an optional add-on — including full start/stop control of the collection from the browser, not just visualization;
 - `main.py`, the original terminal entry point, was discontinued: its multi-host collection logic was absorbed into `app.py`, eliminating the duplication that existed between the two entry points for a period of the project;
-- collection was structured to work with multiple simultaneous destinations across network layers (LAN/MAN/WAN), naming files by layer label instead of by IP;
+- collection was structured to work with multiple simultaneous destinations across network layers (LAN/MAN/WAN), naming files by layer label, host and connection type;
 - automatic network detection became a key feature, reducing the need for manual configuration;
 - distribution histograms (requirement 17) and the hypothesis test / t-test (requirement 15) were evaluated and **permanently removed from the confirmed scope** of the project — neither is in progress nor planned for reinstatement;
 - primary storage remained CSV-based; the alternative SQLite support (requirement 7) was implemented and tested as a module (`ArmazenamentoSQLite`), but is not used in the active `app.py` pipeline, which relies on CSV exclusively;
@@ -55,9 +55,9 @@ Each CSV row represents one measurement, with the following schema:
 
 The connection type is not a CSV column: it is recorded in the file name, using the format:
 
-    dados/medicoes_{layer_label}_{session_label}.csv
+    dados/medicoes_{layer_label}_{host}_{session_label}.csv
 
-Example: `medicoes_lan_gateway_wifi.csv`. The layer labels used are `lan_gateway`, `man_provedor` and `wan_google`; the stored session labels are `wifi` and `cabo`, displayed as "Wi-Fi" and "Cabo". The `tipo_conexao` column is reconstructed when the data is loaded, from the file name suffix.
+Example: `medicoes_wan_8.8.8.8_wifi.csv`. The layer labels used are `lan`, `man` and `wan`; the stored session labels are `wifi` and `ethernet`, displayed as "Wi-Fi" and "Ethernet". The `tipo_conexao` column is reconstructed when the data is loaded, from the file name suffix.
 
 ## Methodological decisions
 
