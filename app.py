@@ -154,6 +154,14 @@ else:
     )
     janela = opcoes_janela[opcao_janela]
 
+    # Toggle de destaque de outliers (req. 18): exibido apenas com a coleta
+    # parada, para não interferir na visualização em tempo real. Desmarcado
+    # por padrão — o usuário ativa manualmente quando quiser.
+    if not st.session_state.coleta_ativa:
+        destacar_outliers = st.toggle("Destacar outliers (IQR)", value=False)
+    else:
+        destacar_outliers = False
+
     # st.fragment permite que só esta parte da tela seja recarregada
     # periodicamente, sem re-executar o script inteiro (o que reiniciaria
     # os widgets da barra lateral). run_every só fica ativo enquanto a
@@ -208,14 +216,15 @@ else:
             fig_latencia = gerar_grafico_serie_temporal(
                 df_janela, coluna="latencia_ms", titulo="Latência",
                 rotulo_eixo_y="Latência (ms)", agregacao="1min",
-                salvar_arquivo=False,
+                salvar_arquivo=False, destacar_outliers=destacar_outliers,
             )
             st.plotly_chart(fig_latencia, use_container_width=True)
         with col_b:
             fig_jitter = gerar_grafico_serie_temporal(
                 df_janela, coluna="jitter_ms", titulo="Jitter",
                 rotulo_eixo_y="Jitter (ms)", agregacao="1min",
-                salvar_arquivo=False, cor_grafico="#00ABC2"
+                salvar_arquivo=False, cor_grafico="#00ABC2",
+                destacar_outliers=destacar_outliers,
             )
             st.plotly_chart(fig_jitter, use_container_width=True)
 
