@@ -5,3 +5,4 @@ dados/*
 *.sqlite
 .env
 .vscode/
+.continue/
