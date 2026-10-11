@@ -15,6 +15,8 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 
+from analise.estatisticas import detectar_outliers_iqr
+
 
 def agregar_por_intervalo(df: pd.DataFrame, intervalo: str = "15min") -> pd.DataFrame:
     """
@@ -42,7 +44,8 @@ def gerar_grafico_serie_temporal(
     rotulo_eixo_y: str = "Latência (ms)",
     agregacao: str = "15min",
     cor_grafico: str = "#0073ff",
-    salvar_arquivo: bool = True
+    salvar_arquivo: bool = True,
+    destacar_outliers: bool = False
 ):
     """
     Gera um gráfico de linha interativo mostrando a evolução de uma métrica
@@ -60,6 +63,10 @@ def gerar_grafico_serie_temporal(
     linha em conjuntos de dados muito densos. Quando None (padrão), plota
     os dados brutos, ponto a ponto.
 
+    destacar_outliers: quando True, adiciona marcadores vermelhos sobre os
+    outliers detectados por IQR nos DADOS BRUTOS (nunca na série agregada,
+    que mascararia picos isolados), além de linhas tracejadas com os limites
+    IQR usado como referência visual.
     Retorna a figura do Plotly (além de salvar o arquivo), para permitir
     reaproveitá-la diretamente no dashboard Streamlit mais adiante.
     """
@@ -84,6 +91,33 @@ def gerar_grafico_serie_temporal(
         name=rotulo_eixo_y,
         hovertemplate="%{x|%d/%m %H:%M}<br>%{y:.2f}<extra></extra>",
     ))
+
+    if destacar_outliers:
+        outliers = detectar_outliers_iqr(df, coluna=coluna)
+        if not outliers.empty:
+            fig.add_trace(go.Scatter(
+                x=outliers["timestamp"],
+                y=outliers[coluna],
+                mode="markers",
+                marker=dict(color="#ff1c02", size=8, line=dict(width=1, color="white")),
+                name="Outliers (IQR)",
+                hovertemplate="%{x|%d/%m %H:%M}<br>%{y:.2f}<extra>Outlier (IQR)</extra>",
+            ))
+            # Linhas tracejadas com os limites IQR usados na detecção, para
+            # dar contexto visual ao destaque.
+            limite_inferior = outliers["limite_inferior"].iloc[0]
+            limite_superior = outliers["limite_superior"].iloc[0]
+            for limite, rotulo in [
+                (limite_inferior, "Limite IQR inferior"),
+                (limite_superior, "Limite IQR superior"),
+            ]:
+                fig.add_hline(
+                    y=limite,
+                    line=dict(color="#ff1c02", width=1, dash="dash"),
+                    opacity=0.5,
+                    annotation_text=rotulo,
+                    annotation_position="bottom left" if limite == limite_inferior else "top left",
+                )
 
     subtitulo = f" (média em {agregacao})" if agregacao else " (dados brutos)"
     fig.update_layout(
@@ -198,7 +232,6 @@ if __name__ == "__main__":
     from analise.estatisticas import carregar_medicoes
  
     df = carregar_medicoes("dados/medicoes_8_8_8_8_cabo.csv")
- 
     gerar_grafico_serie_temporal(
         df,
         coluna="latencia_ms",
