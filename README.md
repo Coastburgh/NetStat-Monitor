@@ -19,7 +19,78 @@ A documentação do projeto está disponível em português neste arquivo e em i
 
 A ideia central é permitir que uma mesma sessão de coleta compare diferentes camadas de rede (LAN, MAN e WAN) sem depender de configuração manual de IPs em todos os casos. Para isso, o sistema inclui detecção automática do gateway e do primeiro host externo do provedor. Essa organização por camadas conecta o projeto diretamente ao tópico "Tipos de redes (LAN, MAN, WAN)" da ementa de Introdução a Redes de Computadores.
 
+## Requisitos
 
+- Python 3.10 ou superior;
+- pip;
+- ambiente virtual recomendado.
+
+Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `requirements.txt` contém a lista completa.
+
+## Instalação
+
+1. Clone o repositório:
+
+       git clone https://github.com/Coastburgh/NetStat-Monitor.git
+
+2. Entre na pasta do projeto:
+
+       cd NetStat-Monitor
+
+3. Crie e ative um ambiente virtual:
+
+   Windows (PowerShell):
+
+       python -m venv venv
+       .\venv\Scripts\Activate.ps1
+
+   Caso a execução de scripts esteja bloqueada, execute uma vez:
+
+       Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+   Como alternativa, utilize o `cmd.exe` com `venv\Scripts\activate.bat`.
+
+   Linux/macOS:
+
+       python -m venv venv
+       source venv/bin/activate
+
+4. Instale as dependências:
+
+       pip install -r requirements.txt
+
+## Execução
+
+### Painel Streamlit
+
+    streamlit run app.py
+
+Na interface, é possível:
+
+- informar os hosts das camadas LAN, MAN e WAN;
+- detectar automaticamente o gateway e o primeiro host externo;
+- iniciar e interromper uma coleta;
+- visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura.
+
+### Detecção automática de rede
+
+Para testar apenas a detecção de hosts das camadas de rede:
+
+    python -m coletor.deteccao_rede
+
+### Coleta direta
+
+Para testes rápidos do módulo de coleta:
+
+    python -m coletor.ping_collector
+
+## Fluxo de uso típico
+
+1. o usuário abre a aplicação em Streamlit;
+2. os hosts de cada camada são preenchidos manualmente ou detectados automaticamente;
+3. a coleta é iniciada em múltiplas threads;
+4. as medições são gravadas em CSV;
+5. gráficos e indicadores estatísticos são atualizados em tempo real.
 
 ## Mudanças de escopo e evolução do projeto
 
@@ -102,79 +173,6 @@ Exemplo: `medicoes_wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são 
 - scripts/ — utilitários de apoio e geração de dados simulados.
 
 Todas as pastas de código possuem `__init__.py`.
-
-## Requisitos
-
-- Python 3.10 ou superior;
-- pip;
-- ambiente virtual recomendado.
-
-Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `requirements.txt` contém a lista completa.
-
-## Instalação
-
-1. Clone o repositório:
-
-       git clone https://github.com/Coastburgh/NetStat-Monitor.git
-
-2. Entre na pasta do projeto:
-
-       cd NetStat-Monitor
-
-3. Crie e ative um ambiente virtual:
-
-   Windows (PowerShell):
-
-       python -m venv venv
-       .\venv\Scripts\Activate.ps1
-
-   Caso a execução de scripts esteja bloqueada, execute uma vez:
-
-       Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-   Como alternativa, utilize o `cmd.exe` com `venv\Scripts\activate.bat`.
-
-   Linux/macOS:
-
-       python -m venv venv
-       source venv/bin/activate
-
-4. Instale as dependências:
-
-       pip install -r requirements.txt
-
-## Execução
-
-### Painel Streamlit
-
-    streamlit run app.py
-
-Na interface, é possível:
-
-- informar os hosts das camadas LAN, MAN e WAN;
-- detectar automaticamente o gateway e o primeiro host externo;
-- iniciar e interromper uma coleta;
-- visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura.
-
-### Detecção automática de rede
-
-Para testar apenas a detecção de hosts das camadas de rede:
-
-    python -m coletor.deteccao_rede
-
-### Coleta direta
-
-Para testes rápidos do módulo de coleta:
-
-    python -m coletor.ping_collector
-
-## Fluxo de uso típico
-
-1. o usuário abre a aplicação em Streamlit;
-2. os hosts de cada camada são preenchidos manualmente ou detectados automaticamente;
-3. a coleta é iniciada em múltiplas threads;
-4. as medições são gravadas em CSV;
-5. gráficos e indicadores estatísticos são atualizados em tempo real.
 
 ## Status atual do projeto
 

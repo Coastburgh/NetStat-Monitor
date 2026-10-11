@@ -19,76 +19,6 @@ The project documentation is available in English here and in Portuguese in [REA
 
 The main idea is to allow a single collection session to compare different network layers (LAN, MAN and WAN) without requiring manual IP configuration in most cases. For this purpose, the system includes automatic detection of the default gateway and of the first external host from the Internet provider. This layer-based organization connects the project directly to the "Network types (LAN, MAN, WAN)" topic from the Introduction to Computer Networks syllabus.
 
-## Scope changes and project evolution
-
-During development, some initial plans were revised:
-
-- the comparison with the theoretical M/M/1 queue model was removed from the confirmed scope, with no decision on a future implementation;
-- the Streamlit dashboard became a central part of the solution instead of an optional add-on — including full start/stop control of the collection from the browser, not just visualization;
-- `main.py`, the original terminal entry point, was discontinued: its multi-host collection logic was absorbed into `app.py`, eliminating the duplication that existed between the two entry points for a period of the project;
-- collection was structured to work with multiple simultaneous destinations across network layers (LAN/MAN/WAN), naming files by layer label, host and connection type;
-- automatic network detection became a key feature, reducing the need for manual configuration;
-- distribution histograms (requirement 17) and the hypothesis test / t-test (requirement 15) were evaluated and **permanently removed from the confirmed scope** of the project — neither is in progress nor planned for reinstatement;
-- storage remained CSV-based exclusively; the alternative SQLite support (requirement 7) was evaluated and removed from the project;
-- the schedule was removed from the scope document, to be defined later.
-
-## Implemented features
-
-- periodic latency collection via ping (req. 1, 2, 3);
-- jitter (req. 5) and packet loss rate (req. 4) calculation;
-- simultaneous monitoring of multiple hosts, using threads (req. 10);
-- timeout and unreachable-host handling without interrupting collection (req. 8);
-- CSV storage (req. 6);
-- automatic detection of the default gateway on the local network (LAN);
-- approximation of the first external host through traceroute/tracepath (MAN);
-- Streamlit web interface to start/stop collection and visualize charts in real time (req. 19);
-- descriptive statistics: mean, median, standard deviation and percentiles (req. 11);
-- outlier detection using IQR (req. 13) — Z-score (req. 12) evaluated and removed;
-- correlation between time of day and latency (req. 14);
-- synthetic data generation for development and testing.
-
-## Data format
-
-Each CSV row represents one measurement, with the following schema:
-
-    timestamp,host,latencia_ms,jitter_ms,perda_pacotes_pct
-
-The connection type is not a CSV column: it is recorded in the file name, using the format:
-
-    dados/medicoes_{layer_label}_{host}_{session_label}.csv
-
-Example: `medicoes_wan_8.8.8.8_wifi.csv`. The layer labels used are `lan`, `man` and `wan`; the stored session labels are `wifi` and `ethernet`, displayed as "Wi-Fi" and "Ethernet". The `tipo_conexao` column is reconstructed when the data is loaded, from the file name suffix.
-
-## Methodological decisions
-
-- **IQR for outliers, no Z-score.** The Z-score was evaluated and removed because it assumes a normal distribution and suffers from masking: the outliers themselves inflate the standard deviation and escape detection. Network latency distributions are skewed with a long right tail, which makes IQR the more robust and appropriate choice.
-
-- **Simple solutions first.** Complexity is deferred when not immediately needed (for example, there is no error-type column in the CSV yet).
-- **t-test removed from scope.** Statistical comparison between groups (e.g., Wi-Fi vs. Ethernet) using a t-test was evaluated, but is no longer part of the project's confirmed scope.
-- **Aggregation only for visualization.** Per-minute averages smooth the time-series charts, but are never used for outlier detection — aggregating before detecting outliers would mask real spikes.
-- **Packet loss per window, not cumulative.** The loss rate shown in charts is recalculated per time window, avoiding the cumulative counter (which resets on every collector run) hiding pointwise instability spikes.
-
-## Implementation decisions
-
-- collection is decoupled from storage: `PingCollector` uses callbacks;
-- ping runs through `subprocess`, with `platform.system()` for cross-platform compatibility, avoiding the privilege issues of the `ping3` library on Windows;
-- multi-host collection uses threads, with a `threading.Event` to allow each one to be stopped in a controlled way from the interface (needed for the Streamlit "Stop" button, since there is no Ctrl+C inside a browser);
-- network detection uses `ipconfig`/PowerShell on Windows and `ip route` on Linux for the gateway; `tracert` (Windows), `tracepath` (Linux) or `traceroute` (macOS) for the first external hop;
-- the `dados/` folder is listed in `.gitignore`, covering both real and synthetic CSVs;
-- `scripts/gerar_dados_simulados.py` generates synthetic data so development does not depend on accumulating real measurements.
-
-## Project structure
-
-- app.py — main Streamlit dashboard, the application's single entry point;
-- coletor/ — collection and network detection modules;
-- armazenamento/ — persistence layer for collected data;
-- analise/ — statistical analysis and pattern detection;
-- visualizacao/ — charts and visualizations;
-- dados/ — CSV files generated by collections (ignored by Git);
-- scripts/ — support utilities and synthetic data generation.
-
-All code folders contain an `__init__.py` file.
-
 ## Requirements
 
 - Python 3.10 or newer;
@@ -161,6 +91,76 @@ For quick validation of the collection module:
 3. collection starts across multiple threads;
 4. measurements are saved to CSV files;
 5. charts and statistical indicators are updated in real time.
+
+## Scope changes and project evolution
+
+During development, some initial plans were revised:
+
+- the comparison with the theoretical M/M/1 queue model was removed from the confirmed scope, with no decision on a future implementation;
+- the Streamlit dashboard became a central part of the solution instead of an optional add-on — including full start/stop control of the collection from the browser, not just visualization;
+- `main.py`, the original terminal entry point, was discontinued: its multi-host collection logic was absorbed into `app.py`, eliminating the duplication that existed between the two entry points for a period of the project;
+- collection was structured to work with multiple simultaneous destinations across network layers (LAN/MAN/WAN), naming files by layer label, host and connection type;
+- automatic network detection became a key feature, reducing the need for manual configuration;
+- distribution histograms (requirement 17) and the hypothesis test / t-test (requirement 15) were evaluated and **permanently removed from the confirmed scope** of the project — neither is in progress nor planned for reinstatement;
+- storage remained CSV-based exclusively; the alternative SQLite support (requirement 7) was evaluated and removed from the project;
+- the schedule was removed from the scope document, to be defined later.
+
+## Implemented features
+
+- periodic latency collection via ping (req. 1, 2, 3);
+- jitter (req. 5) and packet loss rate (req. 4) calculation;
+- simultaneous monitoring of multiple hosts, using threads (req. 10);
+- timeout and unreachable-host handling without interrupting collection (req. 8);
+- CSV storage (req. 6);
+- automatic detection of the default gateway on the local network (LAN);
+- approximation of the first external host through traceroute/tracepath (MAN);
+- Streamlit web interface to start/stop collection and visualize charts in real time (req. 19);
+- descriptive statistics: mean, median, standard deviation and percentiles (req. 11);
+- outlier detection using IQR (req. 13) — Z-score (req. 12) evaluated and removed;
+- correlation between time of day and latency (req. 14);
+- synthetic data generation for development and testing.
+
+## Data format
+
+Each CSV row represents one measurement, with the following schema:
+
+    timestamp,host,latencia_ms,jitter_ms,perda_pacotes_pct
+
+The connection type is not a CSV column: it is recorded in the file name, using the format:
+
+    dados/medicoes_{layer_label}_{host}_{session_label}.csv
+
+Example: `medicoes_wan_8.8.8.8_wifi.csv`. The layer labels used are `lan`, `man` and `wan`; the stored session labels are `wifi` and `ethernet`, displayed as "Wi-Fi" and "Ethernet". The `tipo_conexao` column is reconstructed when the data is loaded, from the file name suffix.
+
+## Methodological decisions
+
+- **IQR for outliers, no Z-score.** The Z-score was evaluated and removed because it assumes a normal distribution and suffers from masking: the outliers themselves inflate the standard deviation and escape detection. Network latency distributions are skewed with a long right tail, which makes IQR the more robust and appropriate choice.
+
+- **Simple solutions first.** Complexity is deferred when not immediately needed (for example, there is no error-type column in the CSV yet).
+- **t-test removed from scope.** Statistical comparison between groups (e.g., Wi-Fi vs. Ethernet) using a t-test was evaluated, but is no longer part of the project's confirmed scope.
+- **Aggregation only for visualization.** Per-minute averages smooth the time-series charts, but are never used for outlier detection — aggregating before detecting outliers would mask real spikes.
+- **Packet loss per window, not cumulative.** The loss rate shown in charts is recalculated per time window, avoiding the cumulative counter (which resets on every collector run) hiding pointwise instability spikes.
+
+## Implementation decisions
+
+- collection is decoupled from storage: `PingCollector` uses callbacks;
+- ping runs through `subprocess`, with `platform.system()` for cross-platform compatibility, avoiding the privilege issues of the `ping3` library on Windows;
+- multi-host collection uses threads, with a `threading.Event` to allow each one to be stopped in a controlled way from the interface (needed for the Streamlit "Stop" button, since there is no Ctrl+C inside a browser);
+- network detection uses `ipconfig`/PowerShell on Windows and `ip route` on Linux for the gateway; `tracert` (Windows), `tracepath` (Linux) or `traceroute` (macOS) for the first external hop;
+- the `dados/` folder is listed in `.gitignore`, covering both real and synthetic CSVs;
+- `scripts/gerar_dados_simulados.py` generates synthetic data so development does not depend on accumulating real measurements.
+
+## Project structure
+
+- app.py — main Streamlit dashboard, the application's single entry point;
+- coletor/ — collection and network detection modules;
+- armazenamento/ — persistence layer for collected data;
+- analise/ — statistical analysis and pattern detection;
+- visualizacao/ — charts and visualizations;
+- dados/ — CSV files generated by collections (ignored by Git);
+- scripts/ — support utilities and synthetic data generation.
+
+All code folders contain an `__init__.py` file.
 
 ## Current project status
 
