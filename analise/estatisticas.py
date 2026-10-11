@@ -65,7 +65,7 @@ def calcular_estatisticas_descritivas(df: pd.DataFrame) -> dict:
     }
 
 
-def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5) -> pd.DataFrame:
+def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5, coluna: str = "latencia_ms") -> pd.DataFrame:
     """
     Identifica outliers de latência pelo método do intervalo interquartil (IQR).
 
@@ -73,22 +73,25 @@ def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5) -> pd.Da
     ou acima de Q3 + multiplicador*IQR. O multiplicador padrão (1.5) é o valor
     convencional, o mesmo usado, por exemplo, nos "bigodes" de um boxplot.
 
+    coluna: qual coluna analisar ('latencia_ms' ou 'jitter_ms'), permitindo
+    destacar outliers também no gráfico de jitter, não só no de latência.
+
     Retorna um DataFrame apenas com as linhas identificadas como outliers,
     incluindo as colunas 'limite_inferior' e 'limite_superior' usadas no cálculo,
     para facilitar a conferência/depuração dos resultados.
     """
-    df_validos = df.dropna(subset=["latencia_ms"]).copy()
+    df_validos = df.dropna(subset=[coluna]).copy()
 
-    q1 = df_validos["latencia_ms"].quantile(0.25)
-    q3 = df_validos["latencia_ms"].quantile(0.75)
+    q1 = df_validos[coluna].quantile(0.25)
+    q3 = df_validos[coluna].quantile(0.75)
     iqr = q3 - q1
 
     limite_inferior = q1 - multiplicador * iqr
     limite_superior = q3 + multiplicador * iqr
 
     outliers = df_validos[
-        (df_validos["latencia_ms"] < limite_inferior)
-        | (df_validos["latencia_ms"] > limite_superior)
+        (df_validos[coluna] < limite_inferior)
+        | (df_validos[coluna] > limite_superior)
     ].copy()
     outliers["limite_inferior"] = round(limite_inferior, 2)
     outliers["limite_superior"] = round(limite_superior, 2)
