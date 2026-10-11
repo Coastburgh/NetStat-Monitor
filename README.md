@@ -31,7 +31,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - a coleta foi estruturada para funcionar com múltiplos destinos simultâneos em diferentes camadas de rede (LAN/MAN/WAN), com nomeação de arquivo por rótulo de camada, host e tipo de conexão;
 - a detecção automática de rede passou a ser um recurso principal, para reduzir a configuração manual;
 - os histogramas de distribuição (requisito 17) e o teste de hipóteses / teste t (requisito 15) foram avaliados e **removidos definitivamente do escopo confirmado** do projeto — não estão em andamento nem previstos para retomada;
-- o armazenamento principal permaneceu em CSV; o suporte alternativo em SQLite (requisito 7) foi implementado e testado como módulo (`ArmazenamentoSQLite`), mas não está em uso na pipeline ativa do `app.py`, que utiliza CSV exclusivamente;
+- o armazenamento permaneceu em CSV exclusivamente; o suporte alternativo em SQLite (requisito 7) foi avaliado e removido do projeto;
 - o cronograma foi removido do documento de escopo, com definição posterior.
 
 ## Funcionalidades implementadas
@@ -40,7 +40,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - cálculo de jitter (req. 5) e da taxa de perda de pacotes (req. 4);
 - suporte a múltiplos hosts simultâneos, com coleta em threads (req. 10);
 - tratamento de timeouts e hosts inacessíveis sem interromper a coleta (req. 8);
-- armazenamento em CSV (req. 6); suporte alternativo em SQLite implementado, mas não utilizado na pipeline ativa (req. 7);
+- armazenamento em CSV (req. 6);
 - detecção automática do gateway padrão da rede local (LAN);
 - aproximação do primeiro host externo via traceroute/tracepath (MAN);
 - interface web com Streamlit para iniciar/parar a coleta e visualizar gráficos em tempo real (req. 19);
@@ -184,7 +184,7 @@ Para testes rápidos do módulo de coleta:
 - [x] cálculo de jitter e perda de pacotes (req. 4, 5);
 - [x] monitoramento de múltiplos destinos por camada de rede (req. 10);
 - [x] tratamento de falhas e timeouts (req. 8);
-- [x] armazenamento em CSV (req. 6); suporte SQLite implementado, não utilizado na pipeline ativa (req. 7);
+- [x] armazenamento em CSV (req. 6);
 - [x] detecção automática de gateway e provedor;
 - [x] painel Streamlit com controle completo de iniciar/parar (req. 19);
 - [x] estatísticas descritivas (req. 11);

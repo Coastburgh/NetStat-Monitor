@@ -2,7 +2,6 @@ venv/
 __pycache__/
 *.pyc
 dados/*
-*.sqlite
 .env
 .vscode/
 .continue/

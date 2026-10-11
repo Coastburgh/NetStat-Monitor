@@ -149,7 +149,7 @@ def _criar_callback_com_armazenamento(armazenamento):
     """
     def callback(medicao: dict):
         _exemplo_callback(medicao)          # feedback visual no terminal
-        armazenamento.salvar_medicao(medicao)  # persistência em CSV/SQLite
+        armazenamento.salvar_medicao(medicao)  # persistência em CSV
     return callback
 
 

@@ -29,7 +29,7 @@ During development, some initial plans were revised:
 - collection was structured to work with multiple simultaneous destinations across network layers (LAN/MAN/WAN), naming files by layer label, host and connection type;
 - automatic network detection became a key feature, reducing the need for manual configuration;
 - distribution histograms (requirement 17) and the hypothesis test / t-test (requirement 15) were evaluated and **permanently removed from the confirmed scope** of the project — neither is in progress nor planned for reinstatement;
-- primary storage remained CSV-based; the alternative SQLite support (requirement 7) was implemented and tested as a module (`ArmazenamentoSQLite`), but is not used in the active `app.py` pipeline, which relies on CSV exclusively;
+- storage remained CSV-based exclusively; the alternative SQLite support (requirement 7) was evaluated and removed from the project;
 - the schedule was removed from the scope document, to be defined later.
 
 ## Implemented features
@@ -38,7 +38,7 @@ During development, some initial plans were revised:
 - jitter (req. 5) and packet loss rate (req. 4) calculation;
 - simultaneous monitoring of multiple hosts, using threads (req. 10);
 - timeout and unreachable-host handling without interrupting collection (req. 8);
-- CSV storage (req. 6); alternative SQLite support implemented but not used in the active pipeline (req. 7);
+- CSV storage (req. 6);
 - automatic detection of the default gateway on the local network (LAN);
 - approximation of the first external host through traceroute/tracepath (MAN);
 - Streamlit web interface to start/stop collection and visualize charts in real time (req. 19);
@@ -62,6 +62,7 @@ Example: `medicoes_wan_8.8.8.8_wifi.csv`. The layer labels used are `lan`, `man`
 ## Methodological decisions
 
 - **IQR for outliers, no Z-score.** The Z-score was evaluated and removed because it assumes a normal distribution and suffers from masking: the outliers themselves inflate the standard deviation and escape detection. Network latency distributions are skewed with a long right tail, which makes IQR the more robust and appropriate choice.
+
 - **Simple solutions first.** Complexity is deferred when not immediately needed (for example, there is no error-type column in the CSV yet).
 - **t-test removed from scope.** Statistical comparison between groups (e.g., Wi-Fi vs. Ethernet) using a t-test was evaluated, but is no longer part of the project's confirmed scope.
 - **Aggregation only for visualization.** Per-minute averages smooth the time-series charts, but are never used for outlier detection — aggregating before detecting outliers would mask real spikes.
@@ -169,7 +170,7 @@ For quick validation of the collection module:
 - [x] jitter and packet loss calculation (req. 4, 5);
 - [x] monitoring of multiple targets by network layer (req. 10);
 - [x] failure and timeout handling (req. 8);
-- [x] CSV storage (req. 6); SQLite support implemented, not used in the active pipeline (req. 7);
+- [x] CSV storage (req. 6);
 - [x] automatic detection of gateway and provider host;
 - [x] Streamlit dashboard with full start/stop control (req. 19);
 - [x] descriptive statistics (req. 11);
