@@ -12,6 +12,7 @@ preenchidos automaticamente por detecção do gateway e do primeiro host externo
 import os
 import threading
 
+import pandas as pd
 import streamlit as st
 
 from coletor.ping_collector import PingCollector
@@ -135,7 +136,23 @@ arquivos_disponiveis = (
 if not arquivos_disponiveis:
     st.warning("Nenhum arquivo de dados encontrado ainda. Inicie uma coleta ao lado.")
 else:
-    arquivo_selecionado = st.selectbox("Arquivo para visualizar", arquivos_disponiveis)
+    col_arquivo, col_janela = st.columns(2)
+
+    arquivo_selecionado = col_arquivo.selectbox("Arquivo para visualizar", arquivos_disponiveis)
+
+    # Seletor de janela temporal dos gráficos (independente da barra lateral);
+    # as estatísticas continuam sendo calculadas sobre o arquivo completo.
+    opcoes_janela = {
+        "Últimos 15 min": pd.Timedelta(minutes=15),
+        "Última 1 h": pd.Timedelta(hours=1),
+        "Últimas 6 h": pd.Timedelta(hours=6),
+        "Últimas 24 h": pd.Timedelta(hours=24),
+        "Todos os dados": None,
+    }
+    opcao_janela = col_janela.selectbox(
+        "Janela Temporal", list(opcoes_janela), index=1  # padrão: Última 1 h
+    )
+    janela = opcoes_janela[opcao_janela]
 
     # st.fragment permite que só esta parte da tela seja recarregada
     # periodicamente, sem re-executar o script inteiro (o que reiniciaria
@@ -150,9 +167,17 @@ else:
         estatisticas = calcular_estatisticas_descritivas(df)
         perda_total = calcular_perda_pacotes_total(df)
 
+        # Recorta o DataFrame para a janela escolhida; usado apenas nos gráficos
+        # e na latência instantânea. Estatísticas seguem sobre o arquivo completo.
+        if janela is None or df.empty:
+            df_janela = df
+        else:
+            limite = df["timestamp"].max() - janela
+            df_janela = df[df["timestamp"] >= limite]
+
         # Última leitura válida (instantânea), comparada com a leitura
         # imediatamente anterior (não mais com a média da sessão).
-        latencias_validas = df["latencia_ms"].dropna()
+        latencias_validas = df_janela["latencia_ms"].dropna()
         if len(latencias_validas) >= 2:
             latencia_atual = latencias_validas.iloc[-1]
             delta_vs_anterior = latencia_atual - latencias_validas.iloc[-2]
@@ -181,20 +206,23 @@ else:
         col_a, col_b = st.columns(2)
         with col_a:
             fig_latencia = gerar_grafico_serie_temporal(
-                df, coluna="latencia_ms", titulo="Latência",
+                df_janela, coluna="latencia_ms", titulo="Latência",
                 rotulo_eixo_y="Latência (ms)", agregacao="1min",
                 salvar_arquivo=False,
             )
             st.plotly_chart(fig_latencia, use_container_width=True)
         with col_b:
             fig_jitter = gerar_grafico_serie_temporal(
-                df, coluna="jitter_ms", titulo="Jitter",
+                df_janela, coluna="jitter_ms", titulo="Jitter",
                 rotulo_eixo_y="Jitter (ms)", agregacao="1min",
                 salvar_arquivo=False, cor_grafico="#00ABC2"
             )
             st.plotly_chart(fig_jitter, use_container_width=True)
 
-        fig_perda = gerar_grafico_taxa_perda_pacotes(df, janela="1min", salvar_arquivo=False)
+        fig_perda = gerar_grafico_taxa_perda_pacotes(df_janela, janela="1min", salvar_arquivo=False)
         st.plotly_chart(fig_perda, use_container_width=True)
 
+        st.caption(f"Gráficos mostram: {opcao_janela} — estatísticas usam o arquivo completo.")
+
     mostrar_dados()
+
