@@ -65,9 +65,6 @@ Ramo da estatística/matemática aplicada que estuda o comportamento de sistemas
 **CSV (Comma-Separated Values)**
 Formato de arquivo de texto simples utilizado para armazenar dados tabulares, com valores separados por vírgulas.
 
-**SQLite**
-Sistema de banco de dados relacional leve, que armazena todo o banco em um único arquivo, sem necessidade de um servidor separado.
-
 **Matplotlib**
 Biblioteca Python utilizada para geração de gráficos, como séries temporais e histogramas.
 
