@@ -193,7 +193,6 @@ Todas as pastas de código possuem `__init__.py`.
 
 ### Pendente
 
-- [ ] destaque visual de outliers diretamente nos gráficos de série temporal (req. 18);
 - [ ] geração automatizada de relatório consolidado (req. 20);
 - [ ] coleta extensiva em múltiplos dias para validação real;
 - [ ] comparação mais aprofundada entre Wi-Fi e Ethernet;
