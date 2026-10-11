@@ -117,6 +117,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - interface web com Streamlit para iniciar/parar a coleta e visualizar gráficos em tempo real (req. 19);
 - estatística descritiva com média, mediana, desvio padrão e percentis (req. 11);
 - identificação de outliers por IQR (req. 13) — z-score (req. 12) avaliado e removido;
+- destaque visual de outliers por IQR nos gráficos de série temporal, ativável por toggle no painel (req. 18);
 - correlação entre horário do dia e latência (req. 14);
 - geração de dados simulados para desenvolvimento e testes.
 
@@ -187,7 +188,8 @@ Todas as pastas de código possuem `__init__.py`.
 - [x] painel Streamlit com controle completo de iniciar/parar (req. 19);
 - [x] estatísticas descritivas (req. 11);
 - [x] detecção de outliers por IQR (req. 13);
-- [x] correlação entre horário e latência (req. 14).
+- [x] correlação entre horário e latência (req. 14);
+- [x] destaque visual de outliers nos gráficos de série temporal (req. 18), ativável por toggle no painel.
 
 ### Pendente
 
