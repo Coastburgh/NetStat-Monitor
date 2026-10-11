@@ -217,4 +217,4 @@ Para testes rápidos do módulo de coleta:
 
 ## Licença
 
-Este projeto é destinado a fins acadêmicos e de desenvolvimento de software em contexto universitário.
+[Licença MIT](LICENSE). Este projeto é destinado a fins acadêmicos e de desenvolvimento de software em contexto universitário.

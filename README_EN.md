@@ -203,4 +203,4 @@ For quick validation of the collection module:
 
 ## License
 
-This project is intended for academic and software development purposes within a university context.
+[MIT License](LICENSE). This project is intended for academic and software development purposes within a university context.
