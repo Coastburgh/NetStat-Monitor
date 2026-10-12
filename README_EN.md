@@ -117,6 +117,7 @@ During development, some initial plans were revised:
 - Streamlit web interface to start/stop collection and visualize charts in real time (req. 19);
 - descriptive statistics: mean, median, standard deviation and percentiles (req. 11);
 - outlier detection using IQR (req. 13) — Z-score (req. 12) evaluated and removed;
+- visual highlighting of IQR outliers on the time-series charts, enabled by a dashboard toggle (req. 18);
 - correlation between time of day and latency (req. 14);
 - synthetic data generation for development and testing.
 
@@ -175,11 +176,11 @@ All code folders contain an `__init__.py` file.
 - [x] Streamlit dashboard with full start/stop control (req. 19);
 - [x] descriptive statistics (req. 11);
 - [x] IQR-based outlier detection (req. 13);
-- [x] correlation between time of day and latency (req. 14).
+- [x] correlation between time of day and latency (req. 14);
+- [x] visual highlighting of outliers on the time-series charts (req. 18), enabled by a dashboard toggle.
 
 ### Pending
 
-- [ ] visual highlighting of outliers directly on the time-series charts (req. 18);
 - [ ] automated consolidated report generation (req. 20);
 - [ ] extended multi-day collection for real validation;
 - [ ] deeper comparison between Wi-Fi and Ethernet;
@@ -204,3 +205,5 @@ All code folders contain an `__init__.py` file.
 ## License
 
 [MIT License](LICENSE). This project is intended for academic and software development purposes within a university context.
+
+
