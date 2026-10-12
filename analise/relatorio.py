@@ -118,15 +118,15 @@ def _secao_comparativa(resultados: list[dict]) -> str:
     linhas = [
         "## Comparação geral",
         "",
-        "| Arquivo | Camada | Conexão | Média (ms) | Desvio padrão (ms) | Perda total (%) | Outliers (%) |",
+        "| Host | Conexão | Camada | Média (ms) | Desvio padrão (ms) | Perda total (%) | Outliers (%) |",
         "|---|---|---|---|---|---|---|",
     ]
 
     for resultado in resultados:
         if resultado["estatisticas"]["quantidade_amostras"] == 0:
             linhas.append(
-                f"| `{resultado['nome_arquivo']}` | {resultado['metadados']['camada']} "
-                f"| {resultado['metadados']['sessao']} | — | — | — | — |"
+                f"| `{resultado['metadados']['host']}` | {resultado['metadados']['sessao']} "
+                f"| {resultado['metadados']['camada']} | — | — | — | — |"
             )
             continue
 
@@ -135,8 +135,8 @@ def _secao_comparativa(resultados: list[dict]) -> str:
             resultado["quantidade_outliers"] / estatisticas["quantidade_amostras"] * 100, 2
         )
         linhas.append(
-            f"| `{resultado['nome_arquivo']}` | {resultado['metadados']['camada']} "
-            f"| {resultado['metadados']['sessao']} | {estatisticas['media_ms']} "
+            f"| `{resultado['metadados']['host']}` | {resultado['metadados']['sessao']} "
+            f"| {resultado['metadados']['camada']} | {estatisticas['media_ms']} "
             f"| {estatisticas['desvio_padrao_ms']} | {resultado['perda_total']} "
             f"| {percentual_outliers} |"
         )
