@@ -25,10 +25,10 @@ from visualizacao.graficos import calcular_perda_pacotes_total
 PASTA_DADOS = "dados"
 PASTA_RELATORIOS = os.path.join(PASTA_DADOS, "relatorios")
 
-# Padrão do nome de arquivo: medicoes_{rotulo_camada}_{host}_{rotulo_sessao}.csv
+# Padrão do nome de arquivo: {rotulo_camada}_{host}_{rotulo_sessao}.csv
 # O host pode conter pontos e travessões, mas não underscores.
 PADRAO_NOME_ARQUIVO = re.compile(
-    r"^medicoes_(?P<camada>lan|man|wan)_(?P<host>[^_]+)_(?P<sessao>wifi|ethernet)\.csv$"
+    r"^(?P<camada>lan|man|wan)_(?P<host>[^_]+)_(?P<sessao>wifi|ethernet)\.csv$"
 )
 
 ROTULOS_CAMADA = {"lan": "LAN (gateway)", "man": "MAN (provedor)", "wan": "WAN (externo)"}
@@ -38,7 +38,7 @@ ROTULOS_SESSAO = {"wifi": "Wi-Fi", "ethernet": "Ethernet"}
 def extrair_metadados_nome_arquivo(nome_arquivo: str) -> dict:
     """
     Extrai camada, host e tipo de conexão do nome do arquivo CSV, seguindo
-    o padrão medicoes_{rotulo_camada}_{host}_{rotulo_sessao}.csv.
+    o padrão {rotulo_camada}_{host}_{rotulo_sessao}.csv.
 
     Retorna um dict com as chaves 'camada', 'host' e 'sessao'. Quando o nome
     não segue o padrão (ex.: arquivo renomeado manualmente), retorna rótulos

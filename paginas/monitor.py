@@ -36,8 +36,6 @@ if "coleta_ativa" not in st.session_state:
     st.session_state.stop_events = {}
 
 # --- Barra lateral: configuração e controle da coleta ---
-st.sidebar.image("https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7")
-st.sidebar.divider()
 st.sidebar.header("Configuração da coleta")
 st.sidebar.text("Informe os endereços à monitorar")
 
@@ -90,7 +88,7 @@ if iniciar and hosts_rotulados:
         coletor = PingCollector(host=host, intervalo_segundos=intervalo)
 
         endereco = host.strip()
-        nome_arquivo = f"{PASTA_DADOS}/medicoes_{rotulo}_{endereco}_{tipo_conexao}.csv"
+        nome_arquivo = f"{PASTA_DADOS}/{rotulo}_{endereco}_{tipo_conexao.lower()}.csv"
         armazenamento = ArmazenamentoCSV(caminho_arquivo=nome_arquivo)
 
         # O parâmetro default=armazenamento evita um erro clássico de closure em
