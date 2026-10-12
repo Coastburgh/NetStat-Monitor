@@ -7,15 +7,11 @@ Projeto Integrador 2026/2 — Faculdade de Princípios Militares
 Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo
 Professor: Leonardo A. Portes
 
-[English version](README_EN.md)
-
 ---
 
 ## Visão geral
 
 O NetStat Monitor é uma ferramenta para monitorar e analisar métricas de rede em tempo real, com foco em latência, jitter, perda de pacotes e comportamento de acesso à internet. O projeto coleta dados por ping em intervalos configuráveis, salva as medições em arquivos CSV e aplica análise estatística para caracterizar o comportamento da rede e identificar anomalias. Os resultados são apresentados em um painel interativo em Streamlit.
-
-A documentação do projeto está disponível em português neste arquivo e em inglês em [README_EN.md](README_EN.md).
 
 A ideia central é permitir que uma mesma sessão de coleta compare diferentes camadas de rede (LAN, MAN e WAN) sem depender de configuração manual de IPs em todos os casos. Para isso, o sistema inclui detecção automática do gateway e do primeiro host externo do provedor. Essa organização por camadas conecta o projeto diretamente ao tópico "Tipos de redes (LAN, MAN, WAN)" da ementa de Introdução a Redes de Computadores.
 
