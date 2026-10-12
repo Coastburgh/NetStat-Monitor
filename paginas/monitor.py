@@ -11,7 +11,6 @@ automaticamente por detecção do gateway e do primeiro host externo.
 
 import os
 import threading
-from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -243,15 +242,5 @@ if not st.session_state.coleta_ativa:
     if col_botao.button("Gerar relatório consolidado", type="primary"):
         with st.spinner("Consolidando medições e gerando relatório..."):
             conteudo = gerar_relatorio_consolidado()
-            caminho_salvo = salvar_relatorio(conteudo)
-        st.session_state.relatorio_gerado = {
-            "conteudo": conteudo,
-            "caminho": caminho_salvo,
-            "data_geracao": datetime.now().strftime("%d/%m/%Y %H:%M"),
-        }
+            salvar_relatorio(conteudo)
         col_aviso.success("Relatório gerado. Veja a página **Relatório** na navegação.")
-    elif "relatorio_gerado" in st.session_state:
-        col_aviso.caption(
-            "Último relatório disponível na página **Relatório** "
-            f"(gerado em {st.session_state.relatorio_gerado['data_geracao']})."
-        )
