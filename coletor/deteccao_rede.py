@@ -137,7 +137,7 @@ def detectar_hosts_camadas(destino_wan: str = "8.8.8.8") -> dict:
     - man_provedor: o primeiro salto genuinamente público no caminho até
       destino_wan, uma APROXIMAÇÃO da infraestrutura do provedor — pode
       vir como None
-    - wan_google: o destino externo fixo, fornecido diretamente
+    - wan_destino: o destino externo fixo, fornecido diretamente
 
     Um valor None significa que a interface deve permitir preenchimento
     manual — a detecção é um atalho, nunca uma dependência obrigatória.
@@ -148,7 +148,7 @@ def detectar_hosts_camadas(destino_wan: str = "8.8.8.8") -> dict:
     return {
         "lan_gateway": gateway,
         "man_provedor": primeiro_externo,
-        "wan_google": destino_wan,
+        "wan_destino": destino_wan,
     }
 
 

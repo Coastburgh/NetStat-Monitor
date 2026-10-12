@@ -143,7 +143,7 @@ def calcular_correlacao_horario_latencia(df: pd.DataFrame) -> dict:
 if __name__ == "__main__":
     # Execução manual para teste rápido: python -m analise.estatisticas
     # Ajuste o caminho abaixo para um arquivo real gerado pela coleta.
-    df = carregar_medicoes("dados/medicoes_wan_8_8_8_8_wifi.csv")
+    df = carregar_medicoes("dados/wan_8.8.8.8_wifi.csv")
 
     estatisticas = calcular_estatisticas_descritivas(df)
     print(f"Amostras válidas: {estatisticas['quantidade_amostras']}")
