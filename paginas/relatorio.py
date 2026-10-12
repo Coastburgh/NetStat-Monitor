@@ -14,9 +14,9 @@ from datetime import datetime
 
 import streamlit as st
 
-from analise.relatorio import PASTA_RELATORIOS
+from analise.gerar_relatorio import PASTA_RELATORIOS
 
-st.header("Relatório Consolidado")
+st.header("Preview Relatório Consolidado")
 
 
 def rotulo_relatorio(nome_arquivo: str) -> str:
@@ -82,5 +82,4 @@ else:
     )
 
     st.divider()
-    st.subheader("Preview")
     st.markdown(conteudo)

@@ -1,5 +1,5 @@
 """
-analise/relatorio.py
+analise/gerar_relatorio.py
 
 Módulo responsável pela geração automatizada do relatório consolidado
 das medições coletadas (req. 20).
@@ -213,7 +213,7 @@ def salvar_relatorio(conteudo: str, pasta_relatorios: str = PASTA_RELATORIOS) ->
 
 
 if __name__ == "__main__":
-    # Execução manual para teste rápido: python -m analise.relatorio
+    # Execução manual para teste rápido: python -m analise.gerar_relatorio
     relatorio = gerar_relatorio_consolidado()
     print(relatorio)
     print(f"\n[Salvando cópia em {PASTA_RELATORIOS}]")

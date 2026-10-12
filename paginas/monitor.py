@@ -19,7 +19,7 @@ from coletor.ping_collector import PingCollector
 from coletor.deteccao_rede import detectar_hosts_camadas
 from armazenamento.armazenamento import ArmazenamentoCSV
 from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
-from analise.relatorio import gerar_relatorio_consolidado, salvar_relatorio
+from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
 from visualizacao.graficos import (
     gerar_grafico_serie_temporal,
     gerar_grafico_taxa_perda_pacotes,
@@ -236,7 +236,7 @@ else:
 # Disponível apenas com a coleta parada, para consolidar um conjunto
 # estável de dados. O resultado fica em st.session_state, de onde a
 # página "Relatório" o exibe — nada é gerado automaticamente.
-if not st.session_state.coleta_ativa:
+if not st.session_state.coleta_ativa and arquivos_disponiveis:
     st.divider()
     col_botao, col_aviso = st.columns([1, 3])
     if col_botao.button("Gerar relatório consolidado", type="primary"):

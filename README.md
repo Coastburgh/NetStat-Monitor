@@ -85,7 +85,7 @@ Para testes rápidos do módulo de coleta:
 
 Para gerar o relatório consolidado diretamente pelo terminal (sem o painel):
 
-    python -m analise.relatorio
+    python -m analise.gerar_relatorio
 
 ## Fluxo de uso típico
 
