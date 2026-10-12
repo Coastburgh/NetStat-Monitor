@@ -133,9 +133,9 @@ Cada linha de CSV representa uma medição, com o seguinte esquema:
 
 O tipo de conexão não é uma coluna do CSV: ele é registrado no nome do arquivo, no formato:
 
-    dados/medicoes_{rotulo_camada}_{host}_{rotulo_sessao}.csv
+    dados/{rotulo_camada}_{host}_{rotulo_sessao}.csv
 
-Exemplo: `medicoes_wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `man` e `wan`; os rótulos de sessão armazenados são `wifi` e `ethernet`, exibidos como "Wi-Fi" e "Ethernet". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
+Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `man` e `wan`; os rótulos de sessão armazenados são `wifi` e `ethernet`, exibidos como "Wi-Fi" e "Ethernet". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
 
 ## Relação com o conteúdo das disciplinas
 

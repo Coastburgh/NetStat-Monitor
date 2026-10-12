@@ -9,7 +9,7 @@ sem precisar esperar dias de coleta real.
 
 IMPORTANTE: os dados gerados aqui são artificiais e servem apenas para
 desenvolvimento/teste do código. O relatório final do projeto deve ser
-baseado nos dados reais coletados pelo main.py.
+baseado nos dados reais coletados pelo painel (app.py).
 """
 
 import csv

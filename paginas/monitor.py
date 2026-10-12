@@ -49,7 +49,7 @@ if st.sidebar.button("Detecção Automática", disabled=st.session_state.coleta_
         detectados = detectar_hosts_camadas()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
     st.session_state.man_provedor_input = detectados.get("man_provedor") or ""
-    st.session_state.wan_destino_input = detectados.get("wan_destino") or "8.8.8.8"
+    st.session_state.wan_destino_input = detectados.get("wan_google") or "8.8.8.8"
     st.rerun()
 
 lan_gateway = st.sidebar.text_input(

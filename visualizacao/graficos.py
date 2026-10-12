@@ -20,7 +20,7 @@ from analise.estatisticas import detectar_outliers_iqr
 
 def agregar_por_intervalo(df: pd.DataFrame, intervalo: str = "15min") -> pd.DataFrame:
     """
-    Agrega as medições por intervalo de tempo (padrão: 1 minuto), calculando
+    Agrega as medições por intervalo de tempo (padrão: 15 minutos), calculando
     a média da latência dentro de cada intervalo. Usado apenas para deixar
     o gráfico de série temporal mais legível quando há muitos pontos
     (ex.: uma leitura a cada poucos segundos gera milhares de pontos).
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     # Execução manual para teste rápido: python -m visualizacao.graficos
     from analise.estatisticas import carregar_medicoes
  
-    df = carregar_medicoes("dados/medicoes_8_8_8_8_cabo.csv")
+    df = carregar_medicoes("dados/wan_8.8.8.8_ethernet.csv")
     gerar_grafico_serie_temporal(
         df,
         coluna="latencia_ms",
