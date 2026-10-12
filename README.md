@@ -70,7 +70,8 @@ Na interface, é possível:
 - informar os hosts das camadas LAN, MAN e WAN;
 - detectar automaticamente o gateway e o primeiro host externo;
 - iniciar e interromper uma coleta;
-- visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura.
+- visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura;
+- gerar o relatório consolidado (req. 20) e visualizá-lo em uma página exclusiva, com preview e download.
 
 ### Detecção automática de rede
 
@@ -83,6 +84,12 @@ Para testar apenas a detecção de hosts das camadas de rede:
 Para testes rápidos do módulo de coleta:
 
     python -m coletor.ping_collector
+
+### Relatório consolidado
+
+Para gerar o relatório consolidado diretamente pelo terminal (sem o painel):
+
+    python -m analise.relatorio
 
 ## Fluxo de uso típico
 
@@ -119,6 +126,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - identificação de outliers por IQR (req. 13) — z-score (req. 12) avaliado e removido;
 - destaque visual de outliers por IQR nos gráficos de série temporal, ativável por toggle no painel (req. 18);
 - correlação entre horário do dia e latência (req. 14);
+- geração automatizada de relatório consolidado em Markdown (req. 20), com página exclusiva no painel para preview e download;
 - geração de dados simulados para desenvolvimento e testes.
 
 ## Formato dos dados
@@ -168,9 +176,10 @@ Exemplo: `medicoes_wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são 
 - app.py — painel principal em Streamlit, único ponto de entrada da aplicação;
 - coletor/ — módulos de coleta e detecção de rede;
 - armazenamento/ — persistência dos dados coletados;
-- analise/ — cálculo estatístico e identificação de padrões;
+- analise/ — cálculo estatístico, identificação de padrões e geração do relatório consolidado;
 - visualizacao/ — gráficos e visualizações;
 - dados/ — arquivos CSV gerados pelas coletas (ignorado pelo Git);
+- paginas/ — páginas adicionais do painel Streamlit (Relatório);
 - scripts/ — utilitários de apoio e geração de dados simulados.
 
 Todas as pastas de código possuem `__init__.py`.
@@ -189,11 +198,11 @@ Todas as pastas de código possuem `__init__.py`.
 - [x] estatísticas descritivas (req. 11);
 - [x] detecção de outliers por IQR (req. 13);
 - [x] correlação entre horário e latência (req. 14);
-- [x] destaque visual de outliers nos gráficos de série temporal (req. 18), ativável por toggle no painel.
+- [x] destaque visual de outliers nos gráficos de série temporal (req. 18), ativável por toggle no painel;
+- [x] geração automatizada de relatório consolidado (req. 20).
 
 ### Pendente
 
-- [ ] geração automatizada de relatório consolidado (req. 20);
 - [ ] coleta extensiva em múltiplos dias para validação real;
 - [ ] comparação mais aprofundada entre Wi-Fi e Ethernet;
 - [ ] refinamento das visualizações e exportação de relatórios;
