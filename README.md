@@ -169,13 +169,13 @@ Exemplo: `medicoes_wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são 
 
 ## Estrutura do projeto
 
-- app.py — painel principal em Streamlit, único ponto de entrada da aplicação;
+- app.py — ponto de entrada do painel Streamlit: configura a página e registra a navegação entre as demais;
+- paginas/ — páginas do painel Streamlit: Monitor (coleta e visualização) e Relatório (preview e download do relatório consolidado);
 - coletor/ — módulos de coleta e detecção de rede;
 - armazenamento/ — persistência dos dados coletados;
 - analise/ — cálculo estatístico, identificação de padrões e geração do relatório consolidado;
 - visualizacao/ — gráficos e visualizações;
 - dados/ — arquivos CSV gerados pelas coletas (ignorado pelo Git);
-- paginas/ — páginas adicionais do painel Streamlit (Relatório);
 - scripts/ — utilitários de apoio e geração de dados simulados.
 
 Todas as pastas de código possuem `__init__.py`.
