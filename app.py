@@ -11,6 +11,7 @@ preenchidos automaticamente por detecção do gateway e do primeiro host externo
 
 import os
 import threading
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
@@ -19,6 +20,7 @@ from coletor.ping_collector import PingCollector
 from coletor.deteccao_rede import detectar_hosts_camadas
 from armazenamento.armazenamento import ArmazenamentoCSV
 from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
+from analise.relatorio import gerar_relatorio_consolidado, salvar_relatorio
 from visualizacao.graficos import (
     gerar_grafico_serie_temporal,
     gerar_grafico_taxa_perda_pacotes,
@@ -28,6 +30,13 @@ from visualizacao.graficos import (
 PASTA_DADOS = "dados"
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
+
+# --- Navegação entre páginas: Monitor (este arquivo) e Relatório ---
+# A página de relatório não gera nada por conta própria: exibe apenas o
+# relatório que o usuário gerar aqui, guardado em st.session_state.
+pagina_monitor = st.Page("app.py", title="Monitor", icon=":material/monitoring:", default=True)
+pagina_relatorio = st.Page("paginas/relatorio.py", title="Relatório", icon=":material/description:")
+st.navigation([pagina_monitor, pagina_relatorio])
 
 # --- Estado da sessão: sobrevive entre reruns do Streamlit, enquanto a aba do navegador estiver aberta ---
 if "coleta_ativa" not in st.session_state:
@@ -235,3 +244,25 @@ else:
 
     mostrar_dados()
 
+# --- Geração do relatório consolidado (req. 20) ---
+# Disponível apenas com a coleta parada, para consolidar um conjunto
+# estável de dados. O resultado fica em st.session_state, de onde a
+# página "Relatório" o exibe — nada é gerado automaticamente.
+if not st.session_state.coleta_ativa:
+    st.divider()
+    col_botao, col_aviso = st.columns([1, 3])
+    if col_botao.button("Gerar relatório consolidado", type="primary"):
+        with st.spinner("Consolidando medições e gerando relatório..."):
+            conteudo = gerar_relatorio_consolidado()
+            caminho_salvo = salvar_relatorio(conteudo)
+        st.session_state.relatorio_gerado = {
+            "conteudo": conteudo,
+            "caminho": caminho_salvo,
+            "data_geracao": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        }
+        col_aviso.success("Relatório gerado. Veja a página **Relatório** na navegação.")
+    elif "relatorio_gerado" in st.session_state:
+        col_aviso.caption(
+            "Último relatório disponível na página **Relatório** "
+            f"(gerado em {st.session_state.relatorio_gerado['data_geracao']})."
+        )
