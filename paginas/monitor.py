@@ -28,11 +28,18 @@ from visualizacao.graficos import (
 
 PASTA_DADOS = "dados"
 
-# --- Estado da sessão: sobrevive entre reruns do Streamlit, enquanto a aba do navegador estiver aberta ---
-if "coleta_ativa" not in st.session_state:
-    st.session_state.coleta_ativa = False
-    st.session_state.threads = {}
-    st.session_state.stop_events = {}
+# --- Registro de coleta: vive no processo do servidor (não na sessão da aba) ---
+# Recarregar ou fechar a aba cria uma nova sessão do Streamlit, mas as threads
+# de coleta continuam rodando. Guardá-las em cache_resource permite que a nova
+# sessão as reencontre, mostre o estado correto e consiga pará-las.
+@st.cache_resource
+def obter_registro_coleta() -> dict:
+    return {"threads": {}, "stop_events": {}}
+
+
+registro = obter_registro_coleta()
+# Coleta ativa = existe ao menos uma thread viva no registro.
+st.session_state.coleta_ativa = any(t.is_alive() for t in registro["threads"].values())
 
 # --- Barra lateral: configuração e controle da coleta ---
 st.sidebar.header("Configuração da coleta")
@@ -81,7 +88,7 @@ col_iniciar, col_parar = st.sidebar.columns(2)
 iniciar = col_iniciar.button("Iniciar", disabled=st.session_state.coleta_ativa)
 parar = col_parar.button("Parar", disabled=not st.session_state.coleta_ativa)
 
-if iniciar and hosts_rotulados:
+if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
     for rotulo, host in hosts_rotulados.items():
         stop_event = threading.Event()
         coletor = PingCollector(host=host, intervalo_segundos=intervalo)
@@ -102,22 +109,22 @@ if iniciar and hosts_rotulados:
             daemon=True,
         )
         thread.start()
-        st.session_state.threads[rotulo] = thread
-        st.session_state.stop_events[rotulo] = stop_event
+        registro["threads"][rotulo] = thread
+        registro["stop_events"][rotulo] = stop_event
 
     st.session_state.coleta_ativa = True
     st.rerun()
 
 if parar:
-    for stop_event in st.session_state.stop_events.values():
+    for stop_event in registro["stop_events"].values():
         stop_event.set()
-    st.session_state.threads = {}
-    st.session_state.stop_events = {}
+    registro["threads"].clear()
+    registro["stop_events"].clear()
     st.session_state.coleta_ativa = False
     st.rerun()
 
 if st.session_state.coleta_ativa:
-    st.sidebar.success(f"Coletando: {', '.join(st.session_state.stop_events.keys())}")
+    st.sidebar.success(f"Coletando: {', '.join(registro['stop_events'].keys())}")
 else:
     st.sidebar.info("Coleta parada.")
 
