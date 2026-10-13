@@ -5,3 +5,4 @@ dados/*
 .env
 .vscode/
 .continue/
+.agents/
