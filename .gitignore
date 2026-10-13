@@ -2,7 +2,6 @@
 .vscode/
 .continue/
 .agents/
-.github/
 __pycache__/
 dados/*
 *.pyc
