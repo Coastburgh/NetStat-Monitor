@@ -37,19 +37,19 @@ Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `r
 
    Windows (PowerShell):
 
-       python -m venv venv
-       .\venv\Scripts\Activate.ps1
+       python -m venv .venv
+       .\.venv\Scripts\Activate.ps1
 
    Caso a execução de scripts esteja bloqueada, execute uma vez:
 
        Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-   Como alternativa, utilize o `cmd.exe` com `venv\Scripts\activate.bat`.
+   Como alternativa, utilize o `cmd.exe` com `.venv\Scripts\activate.bat`.
 
    Linux/macOS:
 
-       python -m venv venv
-       source venv/bin/activate
+       python -m venv .venv
+       source .venv/bin/activate
 
 4. Instale as dependências:
 

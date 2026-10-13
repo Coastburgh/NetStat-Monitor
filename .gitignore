@@ -1,7 +1,9 @@
-venv/
-__pycache__/
-*.pyc
-dados/*
-.env
+.venv/
 .vscode/
 .continue/
+.agents/
+.github/
+__pycache__/
+dados/*
+*.pyc
+.env
