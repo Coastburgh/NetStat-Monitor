@@ -6,10 +6,49 @@ rede (LAN, MAN, WAN), evitando que o usuário precise descobrir e digitar
 esses endereços manualmente.
 """
 
+import os
 import subprocess
 import platform
 import re
 import ipaddress
+
+# Consulta PowerShell da rota IPv4 padrão. Lê propriedades de objetos
+# (NextHop, RouteMetric), e não texto de console, então o resultado não
+# depende do idioma do Windows. Rotas "on-link" (NextHop 0.0.0.0) são
+# descartadas; entre as demais, vence a de menor métrica efetiva
+# (métrica da rota + métrica da interface), critério usado pelo Windows.
+_PS_GATEWAY_WINDOWS = (
+    "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' "
+    "| Where-Object { $_.NextHop -ne '0.0.0.0' } "
+    "| Sort-Object { $_.RouteMetric + "
+    "(Get-NetIPInterface -InterfaceIndex $_.ifIndex -AddressFamily IPv4).InterfaceMetric } "
+    "| Select-Object -First 1 -ExpandProperty NextHop"
+)
+
+
+def _env_idioma_neutro() -> dict:
+    """
+    Cópia do ambiente com LC_ALL=C, para que os comandos do Linux/macOS
+    produzam saída em formato fixo, independente do idioma do sistema.
+    """
+    return {**os.environ, "LC_ALL": "C"}
+
+
+def _primeiro_salto_publico_tracert(saida: str, destino: str) -> str:
+    """
+    Lê a saída do 'tracert -d' sem depender do idioma. Cada salto começa
+    com o número do salto e termina com o IP; linhas de timeout ('*') não
+    terminam em IP e são ignoradas, assim como o cabeçalho e o rodapé.
+    O próprio destino é excluído: ele não é um salto do provedor.
+    Retorna None se nenhum salto público intermediário for encontrado.
+    """
+    for linha in saida.splitlines():
+        if not re.match(r"^\s*\d+\s", linha):
+            continue
+        match = re.search(r"(\d{1,3}(?:\.\d{1,3}){3})\s*$", linha)
+        if match and match.group(1) != destino and _eh_ip_publico(match.group(1)):
+            return match.group(1)
+    return None
 
 
 def detectar_gateway() -> str:
@@ -23,17 +62,20 @@ def detectar_gateway() -> str:
     try:
         if sistema == "Windows":
             resultado = subprocess.run(
-                ["ipconfig"], capture_output=True, text=True, timeout=5
+                ["powershell", "-NoProfile", "-Command", _PS_GATEWAY_WINDOWS],
+                capture_output=True, text=True, errors="replace", timeout=10,
             )
-            for linha in resultado.stdout.splitlines():
-                if "Default Gateway" in linha or "Gateway Padrão" in linha:
-                    match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", linha)
-                    if match:
-                        return match.group(1)
+            candidato = resultado.stdout.strip()
+            try:
+                if not ipaddress.IPv4Address(candidato).is_unspecified:
+                    return candidato
+            except ValueError:
+                pass  # saída vazia ou inesperada: sem gateway detectado
         else:
             resultado = subprocess.run(
                 ["ip", "route", "show", "default"],
                 capture_output=True, text=True, timeout=5,
+                env=_env_idioma_neutro(),
             )
             match = re.search(r"default via (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", resultado.stdout)
             if match:
@@ -108,16 +150,24 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
 
     try:
         if sistema == "Windows":
-            comando = ["tracert", "-h", str(max_saltos), "-w", "1000", destino]
+            # -d: sem resolução de DNS (cada salto aparece como IP);
+            # -4: força IPv4 em redes com pilha dupla.
+            comando = ["tracert", "-d", "-4", "-h", str(max_saltos), "-w", "1000", destino]
         elif sistema == "Linux":
             comando = ["tracepath", "-m", str(max_saltos), destino]
         else:  # Darwin (macOS)
             comando = ["traceroute", "-m", str(max_saltos), "-w", "1", destino]
 
-        resultado = subprocess.run(comando, capture_output=True, text=True, timeout=30)
+        resultado = subprocess.run(
+            comando, capture_output=True, text=True, errors="replace", timeout=30,
+            env=None if sistema == "Windows" else _env_idioma_neutro(),
+        )
     except Exception as erro:
         print(f"Aviso: falha ao executar traceroute/tracepath — {type(erro).__name__}: {erro}")
         return None
+
+    if sistema == "Windows":
+        return _primeiro_salto_publico_tracert(resultado.stdout, destino)
 
     for linha in resultado.stdout.splitlines():
         for ip in _extrair_ips_da_linha(linha):
