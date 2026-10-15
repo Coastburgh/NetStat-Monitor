@@ -250,3 +250,4 @@ if not st.session_state.coleta_ativa and arquivos_disponiveis:
             conteudo = gerar_relatorio_consolidado()
             salvar_relatorio(conteudo)
         col_aviso.success("Relatório gerado. Veja a página **Relatório** na navegação.")
+        st.switch_page("paginas/relatorio.py")
