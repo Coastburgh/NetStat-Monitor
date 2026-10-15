@@ -4,9 +4,11 @@ primaryColor = "#00ABC2"
 backgroundColor = "#121922"
 secondaryBackgroundColor = "#06090d"
 textColor = "#e6edf3"
-borderColor = "#232c38"
+borderColor = "#3d444d"
 baseRadius = "6px"
 codeFont = "monospace"
+showSidebarBorder = true
+showWidgetBorder = false
 
 [theme.sidebar]
 backgroundColor = "#06090d"
