@@ -51,7 +51,7 @@ if "lan_gateway_input" not in st.session_state:
     st.session_state.wan_destino_input = ""
 
 if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa):
-    with st.spinner("Detectando hosts..."):
+    with st.spinner("Configurando a coleta..."):
         detectados = detectar_hosts_camadas()
         tipo_detectado = detectar_tipo_conexao()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
