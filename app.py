@@ -11,7 +11,6 @@ import streamlit as st
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
 
-# st.logo("https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7")
 st.logo("assets/NS_logo_long.png", size="large", icon_image="assets/NS_logo_square.png")
 
 

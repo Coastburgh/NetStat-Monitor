@@ -71,8 +71,6 @@ else:
     with open(caminho, mode="r", encoding="utf-8") as f:
         conteudo = f.read()
 
-    st.caption(f"Arquivo: `{caminho}`")
-
     st.download_button(
         "Baixar relatório (.md)",
         data=conteudo,

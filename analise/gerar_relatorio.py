@@ -31,7 +31,7 @@ PADRAO_NOME_ARQUIVO = re.compile(
     r"^(?P<camada>lan|man|wan)_(?P<host>[^_]+)_(?P<sessao>wifi|ethernet)\.csv$"
 )
 
-ROTULOS_CAMADA = {"lan": "LAN (gateway)", "man": "MAN (provedor)", "wan": "WAN (externo)"}
+ROTULOS_CAMADA = {"lan": "LAN (Gateway)", "man": "MAN (Provedor)", "wan": "WAN (Destino)"}
 ROTULOS_SESSAO = {"wifi": "Wi-Fi", "ethernet": "Ethernet"}
 
 
@@ -60,7 +60,7 @@ def _secao_arquivo(nome_arquivo: str, df) -> str:
     linhas = [
         f"## {metadados['camada']} — {metadados['host']} ({metadados['sessao']})",
         "",
-        f"Arquivo: `{nome_arquivo}`",
+        f"Endereço: `{metadados['host']}`",
         "",
     ]
 
