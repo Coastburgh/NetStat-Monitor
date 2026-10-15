@@ -165,7 +165,7 @@ def gerar_grafico_taxa_perda_pacotes(
     df: pd.DataFrame,
     janela: str = "5min",
     caminho_saida: str = "dados/graficos/grafico_perda_pacotes.html",
-    titulo: str = "Taxa de perda de pacotes ao longo do tempo",
+    titulo: str = "Perda de Pacotes",
     cor_grafico: str = "#ff1c02",
     salvar_arquivo: bool = True
 ):
@@ -250,7 +250,7 @@ if __name__ == "__main__":
         titulo="Jitter ao longo do tempo — 8.8.8.8 (Ethernet)",
         rotulo_eixo_y="Jitter (ms)",
         agregacao="15min",
-        cor_grafico="#ffd900"
+        cor_grafico="#00ABC2"
     )
     print("Gráfico de jitter salvo em: dados/graficos/grafico_jitter_cabo.html")
  

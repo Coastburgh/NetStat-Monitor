@@ -43,16 +43,15 @@ st.session_state.coleta_ativa = any(t.is_alive() for t in registro["threads"].va
 
 # --- Barra lateral: configuração e controle da coleta ---
 st.sidebar.header("Configuração da coleta")
-st.sidebar.text("Informe os endereços à monitorar")
 
 # Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
 if "lan_gateway_input" not in st.session_state:
     st.session_state.lan_gateway_input = ""
     st.session_state.man_provedor_input = ""
-    st.session_state.wan_destino_input = "8.8.8.8"
+    st.session_state.wan_destino_input = ""
 
-if st.sidebar.button("Detecção Automática", disabled=st.session_state.coleta_ativa):
-    with st.spinner("Detectando hosts (gateway + traceroute, pode levar alguns segundos)..."):
+if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa):
+    with st.spinner("Detectando hosts..."):
         detectados = detectar_hosts_camadas()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
     st.session_state.man_provedor_input = detectados.get("man_provedor") or ""
@@ -60,13 +59,13 @@ if st.sidebar.button("Detecção Automática", disabled=st.session_state.coleta_
     st.rerun()
 
 lan_gateway = st.sidebar.text_input(
-    "LAN — gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa
+    "LAN — Gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa
 )
 man_provedor = st.sidebar.text_input(
-    "MAN — provedor (aproximado)", key="man_provedor_input", disabled=st.session_state.coleta_ativa
+    "MAN — Provedor", key="man_provedor_input", disabled=st.session_state.coleta_ativa
 )
 wan_destino = st.sidebar.text_input(
-    "WAN — destino externo", key="wan_destino_input", disabled=st.session_state.coleta_ativa
+    "WAN — Destino", key="wan_destino_input", disabled=st.session_state.coleta_ativa
 )
 
 hosts_rotulados = {
@@ -85,8 +84,8 @@ intervalo = st.sidebar.number_input(
 )
 
 col_iniciar, col_parar = st.sidebar.columns(2)
-iniciar = col_iniciar.button("Iniciar", disabled=st.session_state.coleta_ativa)
-parar = col_parar.button("Parar", disabled=not st.session_state.coleta_ativa)
+iniciar = col_iniciar.button("Iniciar", disabled=st.session_state.coleta_ativa, type="primary")
+parar = col_parar.button("Parar", disabled=not st.session_state.coleta_ativa, type="primary")
 
 if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
     for rotulo, host in hosts_rotulados.items():
@@ -129,7 +128,7 @@ else:
     st.sidebar.info("Coleta parada.")
 
 # --- Área principal: visualização dos dados já coletados ---
-st.header("Visualização")
+st.header("Monitor de Rede")
 
 arquivos_disponiveis = (
     sorted(f for f in os.listdir(PASTA_DADOS) if f.endswith(".csv"))
@@ -209,7 +208,7 @@ else:
                 delta_color="inverse",  # menor que a leitura anterior = verde (bom); maior = vermelho
             )
         else:
-            c0.metric("Latência Instantânea", "—")
+            c0.metric("Última Latência", "—" if latencia_atual is None else f"{latencia_atual:.2f} ms")
         c1.metric("Latência Média", f"{estatisticas['media_ms']} ms")
         c2.metric("Desvio Padrão", f"{estatisticas['desvio_padrao_ms']} ms")
         c3.metric("Perda Total de Pacotes", f"{perda_total}%")
@@ -246,7 +245,7 @@ else:
 if not st.session_state.coleta_ativa and arquivos_disponiveis:
     st.divider()
     col_botao, col_aviso = st.columns([1, 3])
-    if col_botao.button("Gerar relatório consolidado", type="primary"):
+    if col_botao.button("Gerar Relatório", type="primary"):
         with st.spinner("Consolidando medições e gerando relatório..."):
             conteudo = gerar_relatorio_consolidado()
             salvar_relatorio(conteudo)
