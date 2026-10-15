@@ -37,19 +37,19 @@ Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `r
 
    Windows (PowerShell):
 
-       python -m venv venv
-       .\venv\Scripts\Activate.ps1
+       python -m venv .venv
+       .\.venv\Scripts\Activate.ps1
 
    Caso a execução de scripts esteja bloqueada, execute uma vez:
 
        Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
-   Como alternativa, utilize o `cmd.exe` com `venv\Scripts\activate.bat`.
+   Como alternativa, utilize o `cmd.exe` com `.venv\Scripts\activate.bat`.
 
    Linux/macOS:
 
-       python -m venv venv
-       source venv/bin/activate
+       python -m venv .venv
+       source .venv/bin/activate
 
 4. Instale as dependências:
 
@@ -163,7 +163,7 @@ Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `m
 - a coleta é desacoplada do armazenamento: o `PingCollector` utiliza callbacks;
 - o ping é executado via `subprocess`, com `platform.system()` para compatibilidade entre sistemas, evitando os problemas de privilégio da biblioteca `ping3` no Windows;
 - a coleta em múltiplos hosts utiliza threads, com `threading.Event` para permitir parar cada uma de forma controlada a partir da interface (necessário para o botão "Parar" do Streamlit, já que não há Ctrl+C dentro do navegador);
-- a detecção de rede usa `ipconfig`/PowerShell no Windows e `ip route` no Linux para o gateway; `tracert` (Windows), `tracepath` (Linux) ou `traceroute` (macOS) para o primeiro salto externo;
+- a detecção de rede usa PowerShell (`Get-NetRoute`) no Windows e `ip route` no Linux para o gateway; `tracert -d` (Windows), `tracepath` (Linux) ou `traceroute` (macOS) para o primeiro salto externo. No Windows, a leitura não depende do idioma do sistema (objetos do PowerShell e linhas de salto do `tracert`, sem rótulos traduzidos); no Linux e no macOS, os comandos rodam com `LC_ALL=C`;
 - a pasta `dados/` está no `.gitignore`, o que inclui CSVs reais e simulados;
 - `scripts/gerar_dados_simulados.py` gera dados sintéticos para permitir o desenvolvimento sem depender do acúmulo de coletas reais.
 
