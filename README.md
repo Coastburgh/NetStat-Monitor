@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="455" height="100" align="center" alt="netstat-logo" src="https://github.com/user-attachments/assets/16340f78-bcbc-495a-b7db-12053cd0deb7" />
+    <img height="100" align="center" alt="netstat-logo" src="assets/NS_logo_long.png" />
 <p/>
 
 Projeto Integrador 2026/2 — Faculdade de Princípios Militares
