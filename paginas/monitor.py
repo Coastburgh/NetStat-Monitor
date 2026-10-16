@@ -230,7 +230,7 @@ else:
                 rotulo_eixo_y="Latência (ms)", agregacao="1min",
                 salvar_arquivo=False, destacar_outliers=destacar_outliers,
             )
-            st.plotly_chart(fig_latencia, use_container_width=True)
+            st.plotly_chart(fig_latencia, width='stretch')
         with col_b:
             fig_jitter = gerar_grafico_serie_temporal(
                 df_janela, coluna="jitter_ms", titulo="Jitter",
@@ -238,10 +238,10 @@ else:
                 salvar_arquivo=False, cor_grafico="#00ABC2",
                 destacar_outliers=destacar_outliers,
             )
-            st.plotly_chart(fig_jitter, use_container_width=True)
+            st.plotly_chart(fig_jitter, width='stretch')
 
         fig_perda = gerar_grafico_taxa_perda_pacotes(df_janela, janela="1min", salvar_arquivo=False)
-        st.plotly_chart(fig_perda, use_container_width=True)
+        st.plotly_chart(fig_perda, width='stretch')
 
         st.caption(f"Gráficos mostram: {opcao_janela} — estatísticas usam o arquivo completo.")
 
