@@ -3,6 +3,8 @@
 .continue/
 .agents/
 __pycache__/
+python/
 dados/*
 *.pyc
 .env
+start.bat
