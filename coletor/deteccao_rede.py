@@ -25,6 +25,18 @@ _PS_GATEWAY_WINDOWS = (
     "| Select-Object -First 1 -ExpandProperty NextHop"
 )
 
+# Consulta PowerShell do tipo físico da interface usada pela rota IPv4
+# padrão. Como a consulta do gateway, lê a propriedade PhysicalMediaType
+# do objeto (valor fixo, independente do idioma do Windows): 'Native
+# 802.11' identifica Wi-Fi e '802.3' identifica Ethernet.
+_PS_TIPO_CONEXAO_WINDOWS = (
+    "Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' "
+    "| Sort-Object { $_.RouteMetric + "
+    "(Get-NetIPInterface -InterfaceIndex $_.ifIndex -AddressFamily IPv4).InterfaceMetric } "
+    "| Select-Object -First 1 -PipelineVariable rota "
+    "| ForEach-Object { (Get-NetAdapter -InterfaceIndex $rota.InterfaceIndex).PhysicalMediaType }"
+)
+
 
 def _env_idioma_neutro() -> dict:
     """
@@ -82,6 +94,58 @@ def detectar_gateway() -> str:
                 return match.group(1)
     except Exception as erro:
         print(f"Aviso: falha ao detectar gateway — {type(erro).__name__}: {erro}")
+
+    return None
+
+
+def detectar_tipo_conexao() -> str:
+    """
+    Retorna 'wifi' ou 'ethernet', conforme o tipo físico da interface
+    usada pela rota padrão — a interface que realmente carrega o tráfego
+    quando ambas estão conectadas.
+
+    - Windows: consulta PowerShell que cruza a rota padrão com o tipo
+      físico do adaptador (PhysicalMediaType), lendo propriedades de
+      objetos, imune ao idioma do sistema.
+    - Linux: extrai o dispositivo da rota padrão ('ip route show default')
+      e verifica a existência de /sys/class/net/<dev>/phy80211 — diretório
+      presente apenas em interfaces Wi-Fi. Não depende de 'iw' ou
+      'iwconfig', que podem não estar instalados.
+
+    Retorna None se não conseguir detectar (sem rota padrão, interface
+    virtual como VPN/tethering, timeout). A detecção é um atalho, nunca
+    uma dependência obrigatória — o mesmo contrato de detectar_gateway.
+    """
+    sistema = platform.system()
+
+    try:
+        if sistema == "Windows":
+            resultado = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", _PS_TIPO_CONEXAO_WINDOWS],
+                capture_output=True, text=True, errors="replace", timeout=10,
+            )
+            tipo = resultado.stdout.strip()
+            if tipo == "Native 802.11":
+                return "wifi"
+            if tipo.startswith("802.3"):
+                return "ethernet"
+        else:
+            resultado = subprocess.run(
+                ["ip", "route", "show", "default"],
+                capture_output=True, text=True, timeout=5,
+                env=_env_idioma_neutro(),
+            )
+            match = re.search(r"dev (\S+)", resultado.stdout)
+            if match:
+                dispositivo = match.group(1)
+                if os.path.exists(f"/sys/class/net/{dispositivo}/phy80211"):
+                    return "wifi"
+                # Interfaces físicas sem phy80211 são Ethernet; virtuais
+                # (tun, tap, ppp, wg, usb) não são nenhum dos dois tipos.
+                if not re.match(r"^(tun|tap|ppp|wg|usb)", dispositivo):
+                    return "ethernet"
+    except Exception as erro:
+        print(f"Aviso: falha ao detectar tipo de conexão — {type(erro).__name__}: {erro}")
 
     return None
 
@@ -207,3 +271,6 @@ if __name__ == "__main__":
     hosts = detectar_hosts_camadas()
     for rotulo, host in hosts.items():
         print(f"{rotulo}: {host if host else '(não detectado — preencher manualmente)'}")
+
+    tipo = detectar_tipo_conexao()
+    print(f"tipo_conexao: {tipo if tipo else '(não detectado — selecionar manualmente)'}")

@@ -16,7 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from coletor.ping_collector import PingCollector
-from coletor.deteccao_rede import detectar_hosts_camadas
+from coletor.deteccao_rede import detectar_hosts_camadas, detectar_tipo_conexao
 from armazenamento.armazenamento import ArmazenamentoCSV
 from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
 from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
@@ -51,11 +51,18 @@ if "lan_gateway_input" not in st.session_state:
     st.session_state.wan_destino_input = ""
 
 if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa):
-    with st.spinner("Detectando hosts..."):
+    with st.spinner("Configurando a coleta..."):
         detectados = detectar_hosts_camadas()
+        tipo_detectado = detectar_tipo_conexao()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
     st.session_state.man_provedor_input = detectados.get("man_provedor") or ""
     st.session_state.wan_destino_input = detectados.get("wan_destino") or "8.8.8.8"
+    # A atribuição à chave do selectbox acontece antes do st.rerun(), que
+    # reinicia o script antes de o widget ser instanciado novamente — sem
+    # isso, o Streamlit levantaria erro de widget já instanciado. Se a
+    # detecção falhar (None), o selectbox mantém o valor atual.
+    if tipo_detectado:
+        st.session_state.tipo_conexao_input = "WiFi" if tipo_detectado == "wifi" else "Ethernet"
     st.rerun()
 
 lan_gateway = st.sidebar.text_input(
@@ -78,7 +85,9 @@ hosts_rotulados = {
     if valor.strip()
 }
 
-tipo_conexao = st.sidebar.selectbox("Tipo de conexão", ["WiFi", "Ethernet"])
+tipo_conexao = st.sidebar.selectbox(
+    "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input"
+)
 intervalo = st.sidebar.number_input(
     "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0
 )
@@ -221,7 +230,7 @@ else:
                 rotulo_eixo_y="Latência (ms)", agregacao="1min",
                 salvar_arquivo=False, destacar_outliers=destacar_outliers,
             )
-            st.plotly_chart(fig_latencia, use_container_width=True)
+            st.plotly_chart(fig_latencia, width='stretch')
         with col_b:
             fig_jitter = gerar_grafico_serie_temporal(
                 df_janela, coluna="jitter_ms", titulo="Jitter",
@@ -229,10 +238,10 @@ else:
                 salvar_arquivo=False, cor_grafico="#00ABC2",
                 destacar_outliers=destacar_outliers,
             )
-            st.plotly_chart(fig_jitter, use_container_width=True)
+            st.plotly_chart(fig_jitter, width='stretch')
 
         fig_perda = gerar_grafico_taxa_perda_pacotes(df_janela, janela="1min", salvar_arquivo=False)
-        st.plotly_chart(fig_perda, use_container_width=True)
+        st.plotly_chart(fig_perda, width='stretch')
 
         st.caption(f"Gráficos mostram: {opcao_janela} — estatísticas usam o arquivo completo.")
 
@@ -251,3 +260,4 @@ if not st.session_state.coleta_ativa and arquivos_disponiveis:
             salvar_relatorio(conteudo)
         col_aviso.success("Relatório gerado. Veja a página **Relatório** na navegação.")
         st.switch_page("paginas/relatorio.py")
+
