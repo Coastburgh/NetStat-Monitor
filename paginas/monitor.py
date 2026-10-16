@@ -153,7 +153,7 @@ if parar:
     st.rerun()
 
 if st.session_state.coleta_ativa:
-    st.sidebar.success(f"Coletando: {', '.join(registro['stop_events'].keys())}")
+    st.sidebar.info(f"Coletando: {', '.join(registro['stop_events'].keys())}")
 
 # --- Área principal: visualização dos dados já coletados ---
 st.header("Monitor de Rede")
