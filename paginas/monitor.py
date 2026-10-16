@@ -54,9 +54,12 @@ st.sidebar.header("Configuração da coleta")
 
 # Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
 if "lan_gateway_input" not in st.session_state:
-    st.session_state.lan_gateway_input = ""
-    st.session_state.man_provedor_input = ""
-    st.session_state.wan_destino_input = ""
+    cfg = registro["config"]
+    st.session_state.lan_gateway_input = cfg.get("lan", "")
+    st.session_state.man_provedor_input = cfg.get("man", "")
+    st.session_state.wan_destino_input = cfg.get("wan", "")
+    st.session_state.tipo_conexao_input = cfg.get("tipo_conexao", "WiFi")
+    st.session_state.intervalo_input = cfg.get("intervalo", 5.0)
 
 if st.sidebar.button("Configuração Automática", type="primary", key="bold", disabled=st.session_state.coleta_ativa, width='stretch'):
     with st.sidebar.spinner("Configurando a coleta..."):
@@ -118,6 +121,13 @@ else:
     parar = st.sidebar.button("Parar Coleta", type="primary", key="bold1", width='stretch')
 
 if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
+    registro["config"] = {
+        "lan": lan_gateway.strip(),
+        "man": man_provedor.strip(),
+        "wan": wan_destino.strip(),
+        "tipo_conexao": tipo_conexao,
+        "intervalo": intervalo,
+    }
     for rotulo, host in hosts_rotulados.items():
         stop_event = threading.Event()
         coletor = PingCollector(host=host, intervalo_segundos=intervalo)
