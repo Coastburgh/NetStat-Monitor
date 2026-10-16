@@ -165,7 +165,7 @@ arquivos_disponiveis = (
 )
 
 if not arquivos_disponiveis:
-    st.warning("Nenhum arquivo de dados encontrado ainda. Inicie uma coleta ao lado.")
+    st.info("Nenhum arquivo de dados encontrado ainda. Inicie uma coleta ao lado.")
 else:
     col_arquivo, col_janela = st.columns(2)
 
