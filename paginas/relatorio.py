@@ -70,13 +70,23 @@ else:
     with open(caminho, mode="r", encoding="utf-8") as f:
         conteudo = f.read()
 
+    # Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões
+    st.markdown("""
+    <style>
+    .st-key-bold button p {
+        font-weight: 800;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     st.sidebar.download_button(
         "Baixar Relatório (.md)",
         data=conteudo,
         file_name=arquivo_selecionado,
         mime="text/markdown",
         type="primary",
-        width='stretch'
+        width='stretch',
+        key="bold"
     )
 
     # Placeholder para a função de exportar em diferentes formatos, ainda não configurada

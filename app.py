@@ -28,13 +28,23 @@ arquivos_disponiveis = (
     else []
 )
 
-# Sobrescreve o padrão do Streamlit para mudar a cor do botão ENCERRAR
+# Sobrescreve o padrão do Streamlit para mudar a cor do botão ENCERRAR e peso da fonte
 st.markdown("""
 <style>
-.st-key-encerrar button {
-    background-color: #C0392B;
-    border-color: #C0392B;
-    color: #e6edf3;
+.st-key-encerrar button,
+.st-key-encerrar button p {
+    background-color: #fff;
+    border-color: #00ABC2;
+    color: #00ABC2;
+    font-weight: 1000;
+}
+</style>
+""", unsafe_allow_html=True)
+# Sobrescreve o padrão do Streamlit para mudar o peso da fonte do botão Gerar Relatório
+st.markdown("""
+<style>
+.st-key-gerar button p {
+    font-weight: 800;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -47,7 +57,7 @@ with st.sidebar:
             for evento in st.session_state.get("eventos", {}).values():
                 evento.set()
             os.kill(os.getpid(), signal.SIGTERM)
-        if col_gerar.button("Gerar Relatório", disabled=not arquivos_disponiveis, type="primary", width='stretch'):
+        if col_gerar.button("Gerar Relatório", key="gerar", disabled=not arquivos_disponiveis, type="primary", width='stretch'):
             with st.spinner("Consolidando medições e gerando relatório..."):
                 conteudo = gerar_relatorio_consolidado()
                 salvar_relatorio(conteudo)

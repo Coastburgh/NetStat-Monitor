@@ -27,6 +27,15 @@ from visualizacao.graficos import (
 
 PASTA_DADOS = "dados"
 
+# Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões
+st.markdown("""
+<style>
+.st-key-bold button p {
+    font-weight: 800;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- Registro de coleta: vive no processo do servidor (não na sessão da aba) ---
 # Recarregar ou fechar a aba cria uma nova sessão do Streamlit, mas as threads
 # de coleta continuam rodando. Guardá-las em cache_resource permite que a nova
@@ -49,7 +58,7 @@ if "lan_gateway_input" not in st.session_state:
     st.session_state.man_provedor_input = ""
     st.session_state.wan_destino_input = ""
 
-if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa, width='stretch'):
+if st.sidebar.button("Configuração Automática", type="primary", key="bold", disabled=st.session_state.coleta_ativa, width='stretch'):
     with st.sidebar.spinner("Configurando a coleta..."):
         detectados = detectar_hosts_camadas()
         tipo_detectado = detectar_tipo_conexao()
@@ -91,20 +100,22 @@ intervalo = st.sidebar.number_input(
     "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
 )
 
-# Sobrescreve o padrão do Streamlit para mudar a cor do botão Parar Coleta
+# Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões (de novo por chatice do Streamlit)
 st.markdown("""
 <style>
-.st-key-parar button {
-    background-color: #C0392B;
-    border-color: #C0392B;
-    color: #e6edf3;
+.st-key-bold1 button p {
+    font-weight: 800;
 }
 </style>
 """, unsafe_allow_html=True)
 
-col_iniciar, col_parar = st.sidebar.columns(2)
-iniciar = col_iniciar.button("Iniciar Coleta", disabled=st.session_state.coleta_ativa, type="primary", width='stretch')
-parar = col_parar.button("Parar Coleta", disabled=not st.session_state.coleta_ativa, key="parar", width='stretch')
+iniciar = False;
+parar = False;
+
+if not st.session_state.coleta_ativa:
+    iniciar = st.sidebar.button("Iniciar Coleta", type="primary", key="bold1", width='stretch')
+else:
+    parar = st.sidebar.button("Parar Coleta", type="primary", key="bold1", width='stretch')
 
 if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
     for rotulo, host in hosts_rotulados.items():
