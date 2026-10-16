@@ -19,7 +19,6 @@ from coletor.ping_collector import PingCollector
 from coletor.deteccao_rede import detectar_hosts_camadas, detectar_tipo_conexao
 from armazenamento.armazenamento import ArmazenamentoCSV
 from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
-from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
 from visualizacao.graficos import (
     gerar_grafico_serie_temporal,
     gerar_grafico_taxa_perda_pacotes,
@@ -34,7 +33,7 @@ PASTA_DADOS = "dados"
 # sessão as reencontre, mostre o estado correto e consiga pará-las.
 @st.cache_resource
 def obter_registro_coleta() -> dict:
-    return {"threads": {}, "stop_events": {}}
+    return {"threads": {}, "stop_events": {}, "config": {}}
 
 
 registro = obter_registro_coleta()
@@ -50,8 +49,8 @@ if "lan_gateway_input" not in st.session_state:
     st.session_state.man_provedor_input = ""
     st.session_state.wan_destino_input = ""
 
-if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa):
-    with st.spinner("Configurando a coleta..."):
+if st.sidebar.button("Configuração Automática", disabled=st.session_state.coleta_ativa, width='stretch'):
+    with st.sidebar.spinner("Configurando a coleta..."):
         detectados = detectar_hosts_camadas()
         tipo_detectado = detectar_tipo_conexao()
     st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
@@ -86,15 +85,26 @@ hosts_rotulados = {
 }
 
 tipo_conexao = st.sidebar.selectbox(
-    "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input"
+    "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input", disabled=st.session_state.coleta_ativa
 )
 intervalo = st.sidebar.number_input(
-    "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0
+    "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
 )
 
+# Sobrescreve o padrão do Streamlit para mudar a cor do botão Parar Coleta
+st.markdown("""
+<style>
+.st-key-parar button {
+    background-color: #C0392B;
+    border-color: #C0392B;
+    color: #e6edf3;
+}
+</style>
+""", unsafe_allow_html=True)
+
 col_iniciar, col_parar = st.sidebar.columns(2)
-iniciar = col_iniciar.button("Iniciar", disabled=st.session_state.coleta_ativa, type="primary")
-parar = col_parar.button("Parar", disabled=not st.session_state.coleta_ativa, type="primary")
+iniciar = col_iniciar.button("Iniciar Coleta", disabled=st.session_state.coleta_ativa, type="primary", width='stretch')
+parar = col_parar.button("Parar Coleta", disabled=not st.session_state.coleta_ativa, key="parar", width='stretch')
 
 if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
     for rotulo, host in hosts_rotulados.items():
@@ -133,8 +143,6 @@ if parar:
 
 if st.session_state.coleta_ativa:
     st.sidebar.success(f"Coletando: {', '.join(registro['stop_events'].keys())}")
-else:
-    st.sidebar.info("Coleta parada.")
 
 # --- Área principal: visualização dos dados já coletados ---
 st.header("Monitor de Rede")
@@ -246,18 +254,3 @@ else:
         st.caption(f"Gráficos mostram: {opcao_janela} — estatísticas usam o arquivo completo.")
 
     mostrar_dados()
-
-# --- Geração do relatório consolidado (req. 20) ---
-# Disponível apenas com a coleta parada, para consolidar um conjunto
-# estável de dados. O resultado fica em st.session_state, de onde a
-# página "Relatório" o exibe — nada é gerado automaticamente.
-if not st.session_state.coleta_ativa and arquivos_disponiveis:
-    st.divider()
-    col_botao, col_aviso = st.columns([1, 3])
-    if col_botao.button("Gerar Relatório", type="primary"):
-        with st.spinner("Consolidando medições e gerando relatório..."):
-            conteudo = gerar_relatorio_consolidado()
-            salvar_relatorio(conteudo)
-        col_aviso.success("Relatório gerado. Veja a página **Relatório** na navegação.")
-        st.switch_page("paginas/relatorio.py")
-

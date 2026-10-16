@@ -53,8 +53,7 @@ st.sidebar.header("Relatórios salvos")
 if not arquivos_relatorios:
     st.sidebar.info("Nenhum relatório salvo ainda.")
     st.info(
-        "Nenhum relatório disponível. Volte à página **Monitor** e clique em "
-        "**Gerar relatório consolidado** (com a coleta parada)."
+        "Nenhum relatório disponível. Clique em **Gerar Relatório** (com a coleta parada)."
     )
 else:
     # A selectbox exibe os rótulos legíveis; o dicionário devolve o nome
@@ -71,13 +70,22 @@ else:
     with open(caminho, mode="r", encoding="utf-8") as f:
         conteudo = f.read()
 
-    st.download_button(
-        "Baixar relatório (.md)",
+    st.sidebar.download_button(
+        "Baixar Relatório (.md)",
         data=conteudo,
         file_name=arquivo_selecionado,
         mime="text/markdown",
         type="primary",
+        width='stretch'
     )
+
+    # Placeholder para a função de exportar em diferentes formatos, ainda não configurada
+    # st.menu_button(
+    #     "Exportar Relatório",
+    #     options=["PDF", "MARKDOWN"],
+    #     type="primary",
+    #     disabled=True
+    # )
 
     st.divider()
     st.markdown(conteudo)
