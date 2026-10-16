@@ -64,14 +64,15 @@ Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `r
 Na interface, é possível:
 
 - informar os hosts das camadas LAN, MAN e WAN;
-- detectar automaticamente o gateway e o primeiro host externo;
+- detectar automaticamente o gateway, o primeiro host externo e o tipo de conexão (Wi-Fi ou Ethernet);
 - iniciar e interromper uma coleta;
+- encerrar a aplicação diretamente pelo painel (botão "ENCERRAR" na barra lateral);
 - visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura;
 - gerar o relatório consolidado (req. 20) e visualizá-lo em uma página exclusiva, com preview e download.
 
 ### Detecção automática de rede
 
-Para testar apenas a detecção de hosts das camadas de rede:
+Para testar apenas a detecção de hosts das camadas de rede e do tipo de conexão:
 
     python -m coletor.deteccao_rede
 
@@ -117,6 +118,7 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - armazenamento em CSV (req. 6);
 - detecção automática do gateway padrão da rede local (LAN);
 - aproximação do primeiro host externo via traceroute/tracepath (MAN);
+- detecção automática do tipo de conexão (Wi-Fi ou Ethernet) a partir da interface usada pela rota padrão;
 - interface web com Streamlit para iniciar/parar a coleta e visualizar gráficos em tempo real (req. 19);
 - estatística descritiva com média, mediana, desvio padrão e percentis (req. 11);
 - identificação de outliers por IQR (req. 13) — z-score (req. 12) avaliado e removido;
@@ -164,6 +166,7 @@ Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `m
 - o ping é executado via `subprocess`, com `platform.system()` para compatibilidade entre sistemas, evitando os problemas de privilégio da biblioteca `ping3` no Windows;
 - a coleta em múltiplos hosts utiliza threads, com `threading.Event` para permitir parar cada uma de forma controlada a partir da interface (necessário para o botão "Parar" do Streamlit, já que não há Ctrl+C dentro do navegador);
 - a detecção de rede usa PowerShell (`Get-NetRoute`) no Windows e `ip route` no Linux para o gateway; `tracert -d` (Windows), `tracepath` (Linux) ou `traceroute` (macOS) para o primeiro salto externo. No Windows, a leitura não depende do idioma do sistema (objetos do PowerShell e linhas de salto do `tracert`, sem rótulos traduzidos); no Linux e no macOS, os comandos rodam com `LC_ALL=C`;
+- a detecção do tipo de conexão cruza a rota padrão com o tipo físico da interface: no Windows, lê `PhysicalMediaType` do adaptador via PowerShell (`Native 802.11` = Wi-Fi, `802.3` = Ethernet); no Linux, extrai o dispositivo de `ip route show default` e verifica a existência de `/sys/class/net/<dev>/phy80211` (presente apenas em interfaces Wi-Fi), sem depender de `iw`/`iwconfig`. Interfaces virtuais (VPN, tethering) não são classificadas;
 - a pasta `dados/` está no `.gitignore`, o que inclui CSVs reais e simulados;
 - `scripts/gerar_dados_simulados.py` gera dados sintéticos para permitir o desenvolvimento sem depender do acúmulo de coletas reais.
 
@@ -189,7 +192,7 @@ Todas as pastas de código possuem `__init__.py`.
 - [x] monitoramento de múltiplos destinos por camada de rede (req. 10);
 - [x] tratamento de falhas e timeouts (req. 8);
 - [x] armazenamento em CSV (req. 6);
-- [x] detecção automática de gateway e provedor;
+- [x] detecção automática de gateway, provedor e tipo de conexão;
 - [x] painel Streamlit com controle completo de iniciar/parar (req. 19);
 - [x] estatísticas descritivas (req. 11);
 - [x] detecção de outliers por IQR (req. 13);
