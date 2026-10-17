@@ -58,7 +58,8 @@
 - Before committing, run `git diff` and `git status`, and confirm that only the requested files and lines changed.
 - Stage only the files for the requested change with `git add <file>`. Do not use `git add .` unless explicitly authorized by the user.
 - Verify the staged content with `git diff --staged` before committing.
-- Commit with a message in the imperative mood (for English, for Portuguese, use the present tense in the third person singular) that states the change and its purpose, for example: "Fix bug in data parser for empty input" / "Corrige bug no parser de dados para entrada vazia".
+- Never make one big commit with multiple unrelated changes. Each commit should be focused on a single change or fix.
+- Commit with a message in the imperative mood for English, use the present tense in the third person singular for Portuguese, that states the change and its purpose, for example: "Fix bug in data parser for empty input" / "Corrige bug no parser de dados para entrada vazia".
 - Do not push, rebase, reset, amend, or otherwise rewrite history unless the user asks.
 - Keep unrelated changes out of the same commit. If an unrelated change appears, leave it unstaged and mention it in the response.
 
