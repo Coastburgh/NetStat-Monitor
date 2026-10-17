@@ -229,15 +229,35 @@ class InterfaceTest(unittest.TestCase):
                     self.assertEqual(at.metric[0].value, "—")
                     self.assertEqual(at.metric[4].value, "0")
 
-    def test_gerar_visualizar_e_baixar_relatorio(self):
+    def test_gerar_visualizar_e_exportar_relatorio(self):
         self.csv()
         at = self.app().run()
         at.button(key="gerar").click().run()
         self.assertFalse(at.exception)
         self.assertEqual(at.header[0].value, "Preview Relatório Consolidado")
-        self.assertEqual(len(at.get("download_button")), 1)
+        self.assertEqual(len(at.get("download_button")), 2)
+        self.assertEqual(
+            [botao.label for botao in at.get("download_button")],
+            ["Markdown (.md)", "PDF (.pdf)"],
+        )
         self.assertIn("Relatório consolidado", at.markdown[-1].value)
         self.assertEqual(len(list(Path("dados/relatorios").glob("*.md"))), 1)
+
+    def test_falha_na_exportacao_pdf_mantem_markdown_disponivel(self):
+        pasta = Path("dados/relatorios")
+        pasta.mkdir(parents=True)
+        (pasta / "relatorio_20261017_120001.md").write_text("# Relatório", encoding="utf-8")
+        with patch(
+            "analise.gerar_relatorio.exportar_relatorio_pdf",
+            side_effect=ValueError("inválido"),
+        ):
+            at = self.app().switch_page("paginas/relatorio.py").run()
+        self.assertFalse(at.exception)
+        self.assertTrue(at.warning)
+        self.assertEqual(
+            [botao.label for botao in at.get("download_button")],
+            ["Markdown (.md)"],
+        )
 
     def test_relatorios_no_mesmo_minuto_permanecem_acessiveis(self):
         pasta = Path("dados/relatorios")

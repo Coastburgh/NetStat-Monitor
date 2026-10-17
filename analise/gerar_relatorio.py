@@ -11,7 +11,16 @@ pacotes), sem duplicar nenhuma lógica de cálculo.
 """
 
 import os
+import re
 from datetime import datetime
+from html import escape
+from io import BytesIO
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from analise.estatisticas import (
     carregar_medicoes,
@@ -23,6 +32,80 @@ from armazenamento.armazenamento import (
     extrair_metadados_nome_arquivo,
     listar_arquivos,
 )
+
+
+def _formatar_texto_pdf(texto: str) -> str:
+    """Converte a marcação inline usada nos relatórios para o formato do ReportLab."""
+    texto = escape(texto)
+    texto = re.sub(r"`([^`]+)`", r'<font name="Courier">\1</font>', texto)
+    return re.sub(r"_([^_]+)_", r"<i>\1</i>", texto)
+
+
+def exportar_relatorio_pdf(conteudo: str | None) -> bytes:
+    """Gera em memória um PDF legível a partir do Markdown do relatório."""
+    conteudo = conteudo or ""
+    buffer = BytesIO()
+    documento = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+        title="Relatório consolidado — NetStat Monitor",
+    )
+    estilos = getSampleStyleSheet()
+    elementos = []
+    linhas = conteudo.splitlines()
+    indice = 0
+
+    while indice < len(linhas):
+        linha = linhas[indice].strip()
+
+        if linha.startswith("|"):
+            tabela = []
+            while indice < len(linhas) and linhas[indice].strip().startswith("|"):
+                celulas = [
+                    celula.strip()
+                    for celula in linhas[indice].strip().strip("|").split("|")
+                ]
+                if not all(re.fullmatch(r":?-+:?", celula) for celula in celulas):
+                    tabela.append([
+                        Paragraph(_formatar_texto_pdf(celula), estilos["BodyText"])
+                        for celula in celulas
+                    ])
+                indice += 1
+            if tabela:
+                largura_coluna = documento.width / len(tabela[0])
+                elemento_tabela = Table(
+                    tabela,
+                    colWidths=[largura_coluna] * len(tabela[0]),
+                    repeatRows=1,
+                )
+                elemento_tabela.setStyle(
+                    TableStyle([
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")),
+                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ])
+                )
+                elementos.extend([elemento_tabela, Spacer(1, 4 * mm)])
+            continue
+
+        if linha.startswith("# "):
+            elementos.append(Paragraph(_formatar_texto_pdf(linha[2:]), estilos["Title"]))
+        elif linha.startswith("## "):
+            elementos.append(Paragraph(_formatar_texto_pdf(linha[3:]), estilos["Heading2"]))
+        elif linha:
+            elementos.append(Paragraph(_formatar_texto_pdf(linha), estilos["BodyText"]))
+        else:
+            elementos.append(Spacer(1, 2 * mm))
+        indice += 1
+
+    documento.build(elementos)
+    return buffer.getvalue()
 
 
 def _secao_arquivo(resultado: dict) -> str:

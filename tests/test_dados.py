@@ -13,7 +13,11 @@ from analise.estatisticas import (
     medicoes_vazias,
     resumir_medicoes,
 )
-from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
+from analise.gerar_relatorio import (
+    exportar_relatorio_pdf,
+    gerar_relatorio_consolidado,
+    salvar_relatorio,
+)
 from armazenamento.armazenamento import (
     ArmazenamentoCSV,
     CAMPOS,
@@ -182,10 +186,11 @@ class DadosTest(unittest.TestCase):
         self.assertEqual(resumir_medicoes(carregar_medicoes(self.csv))["perda_total"], 100)
         self.assertEqual(gerar_medicoes_simuladas("8.8.8.8", 0, 10, 0), [])
 
-    def test_exportacao_markdown_e_html(self):
+    def test_exportacao_markdown_pdf_e_html(self):
         texto = "# Relatório\n\nTeste de exportação.\n"
         caminho = salvar_relatorio(texto, str(self.pasta / "relatorios"))
         self.assertEqual(Path(caminho).read_text(encoding="utf-8"), texto)
+        self.assertTrue(exportar_relatorio_pdf(texto).startswith(b"%PDF-"))
         for funcao, nome in [
             (gerar_grafico_serie_temporal, "serie.html"),
             (gerar_grafico_taxa_perda_pacotes, "perda.html"),
@@ -193,6 +198,15 @@ class DadosTest(unittest.TestCase):
             saida = self.pasta / "graficos" / nome
             funcao(medicoes_vazias(), caminho_saida=str(saida))
             self.assertIn("plotly", saida.read_text(encoding="utf-8"))
+
+    def test_exportacao_pdf_aceita_tabela_acentos_e_conteudo_ausente(self):
+        texto = (
+            "# Relatório consolidado — NetStat Monitor\n\n"
+            "| Métrica | Valor |\n|---|---|\n| Latência média | `10 ms` |\n"
+        )
+        for conteudo in (texto, "", None):
+            with self.subTest(conteudo=conteudo):
+                self.assertTrue(exportar_relatorio_pdf(conteudo).startswith(b"%PDF-"))
 
     def test_agregacao_de_jitter_e_janelas_sem_tentativas(self):
         df = pd.DataFrame({
