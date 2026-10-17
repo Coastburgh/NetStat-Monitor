@@ -17,7 +17,7 @@ from html import escape
 from io import BytesIO
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4, portrait
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -47,7 +47,7 @@ def exportar_relatorio_pdf(conteudo: str | None) -> bytes:
     buffer = BytesIO()
     documento = SimpleDocTemplate(
         buffer,
-        pagesize=landscape(A4),
+        pagesize=portrait(A4),
         rightMargin=15 * mm,
         leftMargin=15 * mm,
         topMargin=15 * mm,
