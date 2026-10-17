@@ -100,7 +100,7 @@ tipo_conexao = st.sidebar.selectbox(
     "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input", disabled=st.session_state.coleta_ativa
 )
 intervalo = st.sidebar.number_input(
-    "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
+    "Intervalo de coleta (segundos)", key="intervalo_input", min_value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
 )
 
 # Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões (de novo por chatice do Streamlit)

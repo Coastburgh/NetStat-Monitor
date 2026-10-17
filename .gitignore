@@ -4,7 +4,9 @@
 .agents/
 __pycache__/
 python/
+dist/
 dados/*
 *.pyc
 .env
 start.bat
+portable.py

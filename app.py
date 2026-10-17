@@ -53,7 +53,7 @@ st.markdown("""
 with st.sidebar:
     col_gerar, col_encerrar = st.columns(2)
     if not st.session_state.coleta_ativa:
-        if col_encerrar.button("ENCERRAR",key="encerrar", width='stretch'):
+        if col_encerrar.button("ENCERRAR", key="encerrar", type="primary", width='stretch'):
             for evento in st.session_state.get("eventos", {}).values():
                 evento.set()
             os.kill(os.getpid(), signal.SIGTERM)
