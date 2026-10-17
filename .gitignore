@@ -1,7 +1,6 @@
 .venv/
 .vscode/
 .continue/
-.agents/
 __pycache__/
 python/
 dist/
@@ -10,4 +9,3 @@ dados/*
 .env
 start.bat
 portable.py
-AGENTS.md
