@@ -18,11 +18,7 @@ st.set_page_config(page_title="NetStat Monitor", layout="wide")
 
 st.logo("assets/NS_logo_long.png", size="large", icon_image="assets/NS_logo_square.png")
 
-# Sobrescreve o padrão do Streamlit para mudar a cor do botão ENCERRAR e peso da fonte
-# Sobrescreve o padrão do Streamlit para mudar o peso da fonte do botão Gerar Relatório
-# Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões
-# (de novo por chatice do Streamlit)
-# (PQP...)
+# Sobrescreve o padrão do Streamlit para mudar a cor e peso da fonte dos botões
 st.html("""
 <style>
 .st-key-bold button p,
