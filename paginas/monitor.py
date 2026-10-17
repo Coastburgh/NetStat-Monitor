@@ -35,6 +35,22 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
+# (de novo por chatice do Streamlit)
+st.markdown("""
+<style>
+.st-key-bold1 button p {
+    font-weight: 800;
+}
+</style>
+""", unsafe_allow_html=True)
+# (PQP...)
+st.markdown("""
+<style>
+.st-key-bold2 button p {
+    font-weight: 800;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # --- Registro de coleta: vive no processo do servidor (não na sessão da aba) ---
 # Recarregar ou fechar a aba cria uma nova sessão do Streamlit, mas as threads
@@ -42,10 +58,25 @@ st.markdown("""
 # sessão as reencontre, mostre o estado correto e consiga pará-las.
 @st.cache_resource
 def obter_registro_coleta() -> dict:
-    return {"threads": {}, "stop_events": {}, "config": {}}
-
+    return {"threads": {}, "stop_events": {}}
 
 registro = obter_registro_coleta()
+
+
+@st.cache_resource
+def obter_configuracao() -> dict:
+    return {
+        "lan": "",
+        "man": "",
+        "wan": "",
+        "tipo_conexao": "WiFi",
+        "intervalo": 5.0,
+        "automatica": False,
+    }
+
+
+configuracao = obter_configuracao()
+
 # Coleta ativa = existe ao menos uma thread viva no registro.
 st.session_state.coleta_ativa = any(t.is_alive() for t in registro["threads"].values())
 
@@ -54,24 +85,48 @@ st.sidebar.header("Configuração da coleta")
 
 # Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
 if "lan_gateway_input" not in st.session_state:
-    st.session_state.lan_gateway_input = ""
-    st.session_state.man_provedor_input = ""
-    st.session_state.wan_destino_input = ""
+    st.session_state.lan_gateway_input = configuracao["lan"]
+    st.session_state.man_provedor_input = configuracao["man"]
+    st.session_state.wan_destino_input = configuracao["wan"]
+    st.session_state.tipo_conexao_input = configuracao["tipo_conexao"]
+    st.session_state.intervalo_input = configuracao["intervalo"]
 
-if st.sidebar.button("Configuração Automática", type="primary", key="bold", disabled=st.session_state.coleta_ativa, width='stretch'):
-    with st.sidebar.spinner("Configurando a coleta..."):
-        detectados = detectar_hosts_camadas()
-        tipo_detectado = detectar_tipo_conexao()
-    st.session_state.lan_gateway_input = detectados.get("lan_gateway") or ""
-    st.session_state.man_provedor_input = detectados.get("man_provedor") or ""
-    st.session_state.wan_destino_input = detectados.get("wan_destino") or "8.8.8.8"
-    # A atribuição à chave do selectbox acontece antes do st.rerun(), que
-    # reinicia o script antes de o widget ser instanciado novamente — sem
-    # isso, o Streamlit levantaria erro de widget já instanciado. Se a
-    # detecção falhar (None), o selectbox mantém o valor atual.
-    if tipo_detectado:
-        st.session_state.tipo_conexao_input = "WiFi" if tipo_detectado == "wifi" else "Ethernet"
-    st.rerun()
+if not configuracao["automatica"]:
+    if st.sidebar.button("Configuração Automática", type="primary", key="bold", disabled=st.session_state.coleta_ativa, width='stretch'):
+        with st.sidebar.spinner("Configurando a coleta..."):
+            detectados = detectar_hosts_camadas()
+            tipo_detectado = detectar_tipo_conexao()
+        configuracao["lan"] = detectados.get("lan_gateway") or ""
+        configuracao["man"] = detectados.get("man_provedor") or ""
+        configuracao["wan"] = detectados.get("wan_destino") or "8.8.8.8"
+        st.session_state.lan_gateway_input = configuracao["lan"]
+        st.session_state.man_provedor_input = configuracao["man"]
+        st.session_state.wan_destino_input = configuracao["wan"]
+        # A atribuição à chave do selectbox acontece antes do st.rerun(), que
+        # reinicia o script antes de o widget ser instanciado novamente — sem
+        # isso, o Streamlit levantaria erro de widget já instanciado. Se a
+        # detecção falhar (None), o selectbox mantém o valor atual.
+        if tipo_detectado:
+            configuracao["tipo_conexao"] = "WiFi" if tipo_detectado == "wifi" else "Ethernet"
+            st.session_state.tipo_conexao_input = configuracao["tipo_conexao"]
+        configuracao["automatica"] = True
+        st.rerun()
+else:
+    if st.sidebar.button("Limpar Configuração", type="primary", key="bold2", disabled=st.session_state.coleta_ativa, width='stretch'):
+        configuracao.update({
+            "lan": "",
+            "man": "",
+            "wan": "",
+            "tipo_conexao": "WiFi",
+            "intervalo": 5.0,
+            "automatica": False,
+        })
+        st.session_state.lan_gateway_input = ""
+        st.session_state.man_provedor_input = ""
+        st.session_state.wan_destino_input = ""
+        st.session_state.tipo_conexao_input = "WiFi"
+        st.session_state.intervalo_input = 5.0
+        st.rerun()
 
 lan_gateway = st.sidebar.text_input(
     "LAN — Gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa
@@ -97,20 +152,19 @@ tipo_conexao = st.sidebar.selectbox(
     "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input", disabled=st.session_state.coleta_ativa
 )
 intervalo = st.sidebar.number_input(
-    "Intervalo entre coletas (segundos)", min_value=1.0, value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
+    "Intervalo de coleta (segundos)", key="intervalo_input", min_value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
 )
 
-# Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões (de novo por chatice do Streamlit)
-st.markdown("""
-<style>
-.st-key-bold1 button p {
-    font-weight: 800;
-}
-</style>
-""", unsafe_allow_html=True)
+configuracao.update({
+    "lan": lan_gateway,
+    "man": man_provedor,
+    "wan": wan_destino,
+    "tipo_conexao": tipo_conexao,
+    "intervalo": intervalo,
+})
 
-iniciar = False;
-parar = False;
+iniciar = False
+parar = False
 
 if not st.session_state.coleta_ativa:
     iniciar = st.sidebar.button("Iniciar Coleta", type="primary", key="bold1", width='stretch')

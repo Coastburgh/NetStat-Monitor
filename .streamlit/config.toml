@@ -7,6 +7,7 @@ textColor = "#e6edf3"
 borderColor = "#3d444d"
 baseRadius = "6px"
 codeFont = "monospace"
+codeTextColor = "#00ABC2"
 showSidebarBorder = true
 showWidgetBorder = false
 
