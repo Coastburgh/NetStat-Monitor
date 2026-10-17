@@ -11,52 +11,23 @@ pacotes), sem duplicar nenhuma lógica de cálculo.
 """
 
 import os
-import re
 from datetime import datetime
 
 from analise.estatisticas import (
     carregar_medicoes,
-    calcular_estatisticas_descritivas,
-    detectar_outliers_iqr,
-    calcular_correlacao_horario_latencia,
+    resumir_medicoes,
 )
-from visualizacao.graficos import calcular_perda_pacotes_total
-
-PASTA_DADOS = "dados"
-PASTA_RELATORIOS = os.path.join(PASTA_DADOS, "relatorios")
-
-# Padrão do nome de arquivo: {rotulo_camada}_{host}_{rotulo_sessao}.csv
-# O host pode conter pontos e travessões, mas não underscores.
-PADRAO_NOME_ARQUIVO = re.compile(
-    r"^(?P<camada>lan|man|wan)_(?P<host>[^_]+)_(?P<sessao>wifi|ethernet)\.csv$"
+from armazenamento.armazenamento import (
+    PASTA_DADOS,
+    PASTA_RELATORIOS,
+    extrair_metadados_nome_arquivo,
+    listar_arquivos,
 )
 
-ROTULOS_CAMADA = {"lan": "LAN (Gateway)", "man": "MAN (Provedor)", "wan": "WAN (Destino)"}
-ROTULOS_SESSAO = {"wifi": "Wi-Fi", "ethernet": "Ethernet"}
 
-
-def extrair_metadados_nome_arquivo(nome_arquivo: str) -> dict:
-    """
-    Extrai camada, host e tipo de conexão do nome do arquivo CSV, seguindo
-    o padrão {rotulo_camada}_{host}_{rotulo_sessao}.csv.
-
-    Retorna um dict com as chaves 'camada', 'host' e 'sessao'. Quando o nome
-    não segue o padrão (ex.: arquivo renomeado manualmente), retorna rótulos
-    genéricos em vez de falhar — o relatório deve consolidar o que existe.
-    """
-    correspondencia = PADRAO_NOME_ARQUIVO.match(nome_arquivo)
-    if correspondencia:
-        return {
-            "camada": ROTULOS_CAMADA[correspondencia.group("camada")],
-            "host": correspondencia.group("host"),
-            "sessao": ROTULOS_SESSAO[correspondencia.group("sessao")],
-        }
-    return {"camada": "Camada não identificada", "host": nome_arquivo, "sessao": "—"}
-
-
-def _secao_arquivo(nome_arquivo: str, df) -> str:
+def _secao_arquivo(resultado: dict) -> str:
     """Monta a seção do relatório referente a um único arquivo CSV."""
-    metadados = extrair_metadados_nome_arquivo(nome_arquivo)
+    metadados = resultado["metadados"]
     linhas = [
         f"## {metadados['camada']} — {metadados['host']} ({metadados['sessao']})",
         "",
@@ -64,20 +35,20 @@ def _secao_arquivo(nome_arquivo: str, df) -> str:
         "",
     ]
 
-    if df.empty:
+    if resultado["quantidade_medicoes"] == 0:
         linhas.append("_Arquivo sem medições registradas._")
         return "\n".join(linhas) + "\n"
 
-    estatisticas = calcular_estatisticas_descritivas(df)
-    perda_total = calcular_perda_pacotes_total(df)
-    outliers = detectar_outliers_iqr(df)
-    correlacao = calcular_correlacao_horario_latencia(df)
+    estatisticas = resultado["estatisticas"]
+    perda_total = resultado["perda_total"]
+    quantidade_outliers = resultado["quantidade_outliers"]
+    correlacao = resultado["correlacao"]
 
     if estatisticas["quantidade_amostras"] == 0:
         linhas.append("_Arquivo sem medições válidas (todas as leituras falharam)._")
         return "\n".join(linhas) + "\n"
 
-    percentual_outliers = round(len(outliers) / estatisticas["quantidade_amostras"] * 100, 2)
+    percentual_outliers = round(quantidade_outliers / estatisticas["quantidade_amostras"] * 100, 2)
     p = estatisticas["percentis_ms"]
 
     linhas += [
@@ -90,7 +61,7 @@ def _secao_arquivo(nome_arquivo: str, df) -> str:
         f"| Percentil 90 | {p['p90']} ms |",
         f"| Percentil 99 | {p['p99']} ms |",
         f"| Perda de pacotes total | {perda_total}% |",
-        f"| Outliers (IQR) | {len(outliers)} ({percentual_outliers}%) |",
+        f"| Outliers (IQR) | {quantidade_outliers} ({percentual_outliers}%) |",
         "",
     ]
 
@@ -103,7 +74,7 @@ def _secao_arquivo(nome_arquivo: str, df) -> str:
     else:
         linhas.append(
             "Correlação horário x latência: dados insuficientes "
-            "(sem variação de horário nas medições)."
+            "(sem variação suficiente de horário ou latência nas medições)."
         )
 
     return "\n".join(linhas) + "\n"
@@ -152,11 +123,7 @@ def gerar_relatorio_consolidado(pasta_dados: str = PASTA_DADOS) -> str:
     Arquivos vazios, sem medições válidas ou fora do padrão de nomeação
     não interrompem a geração: entram no relatório com uma nota apropriada.
     """
-    arquivos_csv = (
-        sorted(f for f in os.listdir(pasta_dados) if f.endswith(".csv"))
-        if os.path.isdir(pasta_dados)
-        else []
-    )
+    arquivos_csv = listar_arquivos(pasta_dados, ".csv")
 
     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
     linhas = [
@@ -175,22 +142,16 @@ def gerar_relatorio_consolidado(pasta_dados: str = PASTA_DADOS) -> str:
     for nome_arquivo in arquivos_csv:
         try:
             df = carregar_medicoes(os.path.join(pasta_dados, nome_arquivo))
-        except Exception as erro:
+            resultado = resumir_medicoes(df, detalhado=True)
+        except (OSError, ValueError) as erro:
             linhas.append(f"## `{nome_arquivo}`\n\n")
             linhas.append(f"_Não foi possível carregar o arquivo: {erro}_\n")
             continue
 
-        estatisticas = calcular_estatisticas_descritivas(df)
-        outliers = detectar_outliers_iqr(df) if not df.empty else df
-        resultados.append({
-            "nome_arquivo": nome_arquivo,
-            "metadados": extrair_metadados_nome_arquivo(nome_arquivo),
-            "estatisticas": estatisticas,
-            "quantidade_outliers": len(outliers),
-            "perda_total": calcular_perda_pacotes_total(df) if not df.empty else 0.0,
-        })
+        resultado["metadados"] = extrair_metadados_nome_arquivo(nome_arquivo)
+        resultados.append(resultado)
 
-        linhas.append(_secao_arquivo(nome_arquivo, df))
+        linhas.append(_secao_arquivo(resultado))
         linhas.append("")
 
     if resultados:

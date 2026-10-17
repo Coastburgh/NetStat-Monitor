@@ -15,9 +15,7 @@ import time
 import subprocess
 import platform
 import re
-import threading
-
-from armazenamento.armazenamento import ArmazenamentoCSV
+import os
 
 
 class PingCollector:
@@ -42,9 +40,9 @@ class PingCollector:
         if self.sistema == "Windows":
             # -n 1 = uma única tentativa | -w em milissegundos
             return ["ping", "-n", "1", "-w", str(self.timeout_segundos * 1000), self.host]
-        else:
-            # Linux/Mac: -c 1 = uma única tentativa | -W em segundos
-            return ["ping", "-c", "1", "-W", str(self.timeout_segundos), self.host]
+        # -W usa milissegundos no macOS e segundos no Linux.
+        espera = self.timeout_segundos * 1000 if self.sistema == "Darwin" else self.timeout_segundos
+        return ["ping", "-c", "1", "-W", str(espera), self.host]
 
     def _extrair_latencia_ms(self, saida_texto: str):
         """
@@ -53,7 +51,7 @@ class PingCollector:
         Retorna None se não encontrar (host não respondeu).
         """
         padrao = r"(?:tempo|time)[=<]\s*(\d+(?:\.\d+)?)\s*ms"
-        resultado = re.search(padrao, saida_texto, re.IGNORECASE)
+        resultado = re.search(padrao, saida_texto or "", re.IGNORECASE)
         if resultado:
             return round(float(resultado.group(1)), 2)
         return None
@@ -62,7 +60,7 @@ class PingCollector:
         """
         Calcula o jitter como a diferença absoluta entre a latência atual
         e a última latência válida registrada. Retorna None quando não há
-        latência anterior para comparar (primeira medição, ou após uma falha).
+        latência anterior para comparar (primeira resposta válida da sessão).
         """
         if latencia_atual_ms is None or self._ultima_latencia_valida is None:
             return None
@@ -81,10 +79,12 @@ class PingCollector:
                 comando,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 timeout=self.timeout_segundos + 2,  # margem de segurança para o processo
+                env=None if self.sistema == "Windows" else {**os.environ, "LC_ALL": "C"},
             )
             latencia_ms = self._extrair_latencia_ms(resultado.stdout)
-        except Exception as erro:
+        except (OSError, subprocess.SubprocessError) as erro:
             print(f"Aviso: falha ao executar ping para {self.host} — {type(erro).__name__}: {erro}")
             latencia_ms = None
 
@@ -121,7 +121,11 @@ class PingCollector:
               f"(intervalo: {self.intervalo_segundos}s, sistema: {self.sistema})")
         while stop_event is None or not stop_event.is_set():
             medicao = self.coletar_uma_medicao()
-            callback(medicao)
+            try:
+                callback(medicao)
+            except (OSError, ValueError, KeyError) as erro:
+                print(f"Aviso: falha ao armazenar medição para {self.host} — {erro}")
+                break
             if stop_event is not None:
                 # wait() retorna assim que o evento for sinalizado, sem
                 # esperar o intervalo inteiro — a thread para na hora.
@@ -154,6 +158,8 @@ def _criar_callback_com_armazenamento(armazenamento):
 
 
 if __name__ == "__main__":
+    from armazenamento.armazenamento import ArmazenamentoCSV
+
     # Execução manual para teste rápido: python -m coletor.ping_collector
     coletor = PingCollector(host="8.8.8.8", intervalo_segundos=2.0)
     armazenamento_csv = ArmazenamentoCSV(caminho_arquivo="dados/medicoes.csv")

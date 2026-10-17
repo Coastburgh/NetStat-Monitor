@@ -10,87 +10,31 @@ automaticamente por detecção do gateway e do primeiro host externo.
 """
 
 import os
-import threading
 
 import pandas as pd
 import streamlit as st
 
-from coletor.ping_collector import PingCollector
+from coletor.controle import configuracao_padrao
 from coletor.deteccao_rede import detectar_hosts_camadas, detectar_tipo_conexao
-from armazenamento.armazenamento import ArmazenamentoCSV
-from analise.estatisticas import carregar_medicoes, calcular_estatisticas_descritivas
+from armazenamento.armazenamento import PASTA_DADOS, listar_arquivos
+from paginas.recursos import (
+    aplicar_configuracao,
+    carregar_dados_monitor,
+    obter_controlador,
+    salvar_campo_configuracao,
+)
 from visualizacao.graficos import (
     gerar_grafico_serie_temporal,
     gerar_grafico_taxa_perda_pacotes,
-    calcular_perda_pacotes_total,
 )
 
-PASTA_DADOS = "dados"
-
-# Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões
-st.markdown("""
-<style>
-.st-key-bold button p {
-    font-weight: 800;
-}
-</style>
-""", unsafe_allow_html=True)
-# (de novo por chatice do Streamlit)
-st.markdown("""
-<style>
-.st-key-bold1 button p {
-    font-weight: 800;
-}
-</style>
-""", unsafe_allow_html=True)
-# (PQP...)
-st.markdown("""
-<style>
-.st-key-bold2 button p {
-    font-weight: 800;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Registro de coleta: vive no processo do servidor (não na sessão da aba) ---
-# Recarregar ou fechar a aba cria uma nova sessão do Streamlit, mas as threads
-# de coleta continuam rodando. Guardá-las em cache_resource permite que a nova
-# sessão as reencontre, mostre o estado correto e consiga pará-las.
-@st.cache_resource
-def obter_registro_coleta() -> dict:
-    return {"threads": {}, "stop_events": {}}
-
-registro = obter_registro_coleta()
-
-
-@st.cache_resource
-def obter_configuracao() -> dict:
-    return {
-        "lan": "",
-        "man": "",
-        "wan": "",
-        "tipo_conexao": "WiFi",
-        "intervalo": 5.0,
-        "automatica": False,
-    }
-
-
-configuracao = obter_configuracao()
-
-# Coleta ativa = existe ao menos uma thread viva no registro.
-st.session_state.coleta_ativa = any(t.is_alive() for t in registro["threads"].values())
+controlador = obter_controlador()
+configuracao = controlador.ler_configuracao()
 
 # --- Barra lateral: configuração e controle da coleta ---
 st.sidebar.header("Configuração da coleta")
 
 # Campos de host por camada de rede (LAN/MAN/WAN), com atalho de detecção automática.
-if "lan_gateway_input" not in st.session_state:
-    st.session_state.lan_gateway_input = configuracao["lan"]
-    st.session_state.man_provedor_input = configuracao["man"]
-    st.session_state.wan_destino_input = configuracao["wan"]
-    st.session_state.tipo_conexao_input = configuracao["tipo_conexao"]
-    st.session_state.intervalo_input = configuracao["intervalo"]
-
 if not configuracao["automatica"]:
     if st.sidebar.button("Configuração Automática", type="primary", key="bold", disabled=st.session_state.coleta_ativa, width='stretch'):
         with st.sidebar.spinner("Configurando a coleta..."):
@@ -99,43 +43,31 @@ if not configuracao["automatica"]:
         configuracao["lan"] = detectados.get("lan_gateway") or ""
         configuracao["man"] = detectados.get("man_provedor") or ""
         configuracao["wan"] = detectados.get("wan_destino") or "8.8.8.8"
-        st.session_state.lan_gateway_input = configuracao["lan"]
-        st.session_state.man_provedor_input = configuracao["man"]
-        st.session_state.wan_destino_input = configuracao["wan"]
         # A atribuição à chave do selectbox acontece antes do st.rerun(), que
         # reinicia o script antes de o widget ser instanciado novamente — sem
         # isso, o Streamlit levantaria erro de widget já instanciado. Se a
         # detecção falhar (None), o selectbox mantém o valor atual.
         if tipo_detectado:
             configuracao["tipo_conexao"] = "WiFi" if tipo_detectado == "wifi" else "Ethernet"
-            st.session_state.tipo_conexao_input = configuracao["tipo_conexao"]
         configuracao["automatica"] = True
+        aplicar_configuracao(configuracao)
         st.rerun()
 else:
     if st.sidebar.button("Limpar Configuração", type="primary", key="bold2", disabled=st.session_state.coleta_ativa, width='stretch'):
-        configuracao.update({
-            "lan": "",
-            "man": "",
-            "wan": "",
-            "tipo_conexao": "WiFi",
-            "intervalo": 5.0,
-            "automatica": False,
-        })
-        st.session_state.lan_gateway_input = ""
-        st.session_state.man_provedor_input = ""
-        st.session_state.wan_destino_input = ""
-        st.session_state.tipo_conexao_input = "WiFi"
-        st.session_state.intervalo_input = 5.0
+        aplicar_configuracao(configuracao_padrao())
         st.rerun()
 
 lan_gateway = st.sidebar.text_input(
-    "LAN — Gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa
+    "LAN — Gateway", key="lan_gateway_input", disabled=st.session_state.coleta_ativa,
+    on_change=salvar_campo_configuracao, args=("lan",),
 )
 man_provedor = st.sidebar.text_input(
-    "MAN — Provedor", key="man_provedor_input", disabled=st.session_state.coleta_ativa
+    "MAN — Provedor", key="man_provedor_input", disabled=st.session_state.coleta_ativa,
+    on_change=salvar_campo_configuracao, args=("man",),
 )
 wan_destino = st.sidebar.text_input(
-    "WAN — Destino", key="wan_destino_input", disabled=st.session_state.coleta_ativa
+    "WAN — Destino", key="wan_destino_input", disabled=st.session_state.coleta_ativa,
+    on_change=salvar_campo_configuracao, args=("wan",),
 )
 
 hosts_rotulados = {
@@ -149,19 +81,13 @@ hosts_rotulados = {
 }
 
 tipo_conexao = st.sidebar.selectbox(
-    "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input", disabled=st.session_state.coleta_ativa
+    "Tipo de conexão", ["WiFi", "Ethernet"], key="tipo_conexao_input", disabled=st.session_state.coleta_ativa,
+    on_change=salvar_campo_configuracao, args=("tipo_conexao",),
 )
 intervalo = st.sidebar.number_input(
-    "Intervalo de coleta (segundos)", key="intervalo_input", min_value=5.0, step=1.0, disabled=st.session_state.coleta_ativa
+    "Intervalo de coleta (segundos)", key="intervalo_input", min_value=5.0, step=1.0, disabled=st.session_state.coleta_ativa,
+    on_change=salvar_campo_configuracao, args=("intervalo",),
 )
-
-configuracao.update({
-    "lan": lan_gateway,
-    "man": man_provedor,
-    "wan": wan_destino,
-    "tipo_conexao": tipo_conexao,
-    "intervalo": intervalo,
-})
 
 iniciar = False
 parar = False
@@ -171,52 +97,27 @@ if not st.session_state.coleta_ativa:
 else:
     parar = st.sidebar.button("Parar Coleta", type="primary", key="bold1", width='stretch')
 
-if iniciar and hosts_rotulados and not st.session_state.coleta_ativa:
-    for rotulo, host in hosts_rotulados.items():
-        stop_event = threading.Event()
-        coletor = PingCollector(host=host, intervalo_segundos=intervalo)
-
-        endereco = host.strip()
-        nome_arquivo = f"{PASTA_DADOS}/{rotulo}_{endereco}_{tipo_conexao.lower()}.csv"
-        armazenamento = ArmazenamentoCSV(caminho_arquivo=nome_arquivo)
-
-        # O parâmetro default=armazenamento evita um erro clássico de closure em
-        # loops (sem ele, todas as threads acabariam usando o último armazenamento
-        # criado no loop, não o seu próprio).
-        def callback(medicao, armazenamento=armazenamento):
-            armazenamento.salvar_medicao(medicao)
-
-        thread = threading.Thread(
-            target=coletor.iniciar_coleta_continua,
-            args=(callback, stop_event),
-            daemon=True,
-        )
-        thread.start()
-        registro["threads"][rotulo] = thread
-        registro["stop_events"][rotulo] = stop_event
-
-    st.session_state.coleta_ativa = True
-    st.rerun()
+if iniciar:
+    try:
+        controlador.iniciar(hosts_rotulados, tipo_conexao, intervalo)
+    except (OSError, ValueError, RuntimeError) as erro:
+        st.sidebar.error(f"Não foi possível iniciar a coleta: {erro}")
+    else:
+        st.rerun()
 
 if parar:
-    for stop_event in registro["stop_events"].values():
-        stop_event.set()
-    registro["threads"].clear()
-    registro["stop_events"].clear()
-    st.session_state.coleta_ativa = False
-    st.rerun()
+    if controlador.parar():
+        st.rerun()
+    else:
+        st.sidebar.warning("Aguardando o término da medição em andamento.")
 
 if st.session_state.coleta_ativa:
-    st.sidebar.info(f"Coletando: {', '.join(registro['stop_events'].keys())}")
+    st.sidebar.info(f"Coletando: {', '.join(controlador.camadas_ativas())}")
 
 # --- Área principal: visualização dos dados já coletados ---
 st.header("Monitor de Rede")
 
-arquivos_disponiveis = (
-    sorted(f for f in os.listdir(PASTA_DADOS) if f.endswith(".csv"))
-    if os.path.isdir(PASTA_DADOS)
-    else []
-)
+arquivos_disponiveis = listar_arquivos(PASTA_DADOS, ".csv")
 
 if not arquivos_disponiveis:
     st.info("Nenhum arquivo de dados encontrado ainda. Inicie uma coleta ao lado.")
@@ -254,11 +155,17 @@ else:
     # trocar de arquivo selecionado.
     @st.fragment(run_every=5 if st.session_state.coleta_ativa else None)
     def mostrar_dados():
+        if bool(controlador.camadas_ativas()) != st.session_state.coleta_ativa:
+            st.rerun()
         caminho = os.path.join(PASTA_DADOS, arquivo_selecionado)
-        df = carregar_medicoes(caminho)
+        try:
+            df, resumo = carregar_dados_monitor(caminho)
+        except (OSError, ValueError) as erro:
+            st.warning(f"Não foi possível carregar as medições: {erro}")
+            return
 
-        estatisticas = calcular_estatisticas_descritivas(df)
-        perda_total = calcular_perda_pacotes_total(df)
+        estatisticas = resumo["estatisticas"]
+        perda_total = resumo["perda_total"]
 
         # Recorta o DataFrame para a janela escolhida; usado apenas nos gráficos
         # e na latência instantânea. Estatísticas seguem sobre o arquivo completo.

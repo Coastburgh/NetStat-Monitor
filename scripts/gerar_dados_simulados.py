@@ -15,9 +15,15 @@ baseado nos dados reais coletados pelo painel (app.py).
 import csv
 import os
 import random
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
-CAMPOS = ["timestamp", "host", "latencia_ms", "jitter_ms", "perda_pacotes_pct"]
+# Mantém a execução direta por caminho além de python -m scripts.gerar_dados_simulados.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from armazenamento.armazenamento import CAMPOS
 
 
 def gerar_medicoes_simuladas(
@@ -87,8 +93,8 @@ def gerar_medicoes_simuladas(
 
 def salvar_csv(medicoes: list, caminho_arquivo: str):
     pasta = os.path.dirname(caminho_arquivo)
-    if pasta and not os.path.exists(pasta):
-        os.makedirs(pasta)
+    if pasta:
+        os.makedirs(pasta, exist_ok=True)
 
     with open(caminho_arquivo, mode="w", newline="", encoding="utf-8") as f:
         escritor = csv.DictWriter(f, fieldnames=CAMPOS)
