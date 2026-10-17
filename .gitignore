@@ -10,3 +10,4 @@ dados/*
 .env
 start.bat
 portable.py
+AGENTS.md
