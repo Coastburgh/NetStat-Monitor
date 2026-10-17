@@ -14,7 +14,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from analise.gerar_relatorio import PASTA_RELATORIOS
+from armazenamento.armazenamento import PASTA_RELATORIOS, listar_arquivos
 
 st.header("Preview Relatório Consolidado")
 
@@ -39,14 +39,7 @@ def rotulo_relatorio(nome_arquivo: str) -> str:
 
 # --- Barra lateral: seleção entre os relatórios já salvos em disco ---
 # Ordenação decrescente: o mais recente aparece primeiro na selectbox.
-arquivos_relatorios = (
-    sorted(
-        (f for f in os.listdir(PASTA_RELATORIOS) if f.endswith(".md")),
-        reverse=True,
-    )
-    if os.path.isdir(PASTA_RELATORIOS)
-    else []
-)
+arquivos_relatorios = listar_arquivos(PASTA_RELATORIOS, ".md", decrescente=True)
 
 st.sidebar.header("Relatórios salvos")
 
@@ -56,28 +49,21 @@ if not arquivos_relatorios:
         "Nenhum relatório disponível. Clique em **Gerar Relatório** (com a coleta parada)."
     )
 else:
-    # A selectbox exibe os rótulos legíveis; o dicionário devolve o nome
-    # real do arquivo correspondente à escolha do usuário.
-    rotulo_para_arquivo = {rotulo_relatorio(f): f for f in arquivos_relatorios}
-    rotulo_selecionado = st.sidebar.selectbox(
+    # O nome real identifica a opção mesmo quando dois rótulos têm o mesmo minuto.
+    arquivo_selecionado = st.sidebar.selectbox(
         "Relatório gerado em",
-        list(rotulo_para_arquivo),
+        arquivos_relatorios,
         index=0,
+        format_func=rotulo_relatorio,
     )
-    arquivo_selecionado = rotulo_para_arquivo[rotulo_selecionado]
     caminho = os.path.join(PASTA_RELATORIOS, arquivo_selecionado)
 
-    with open(caminho, mode="r", encoding="utf-8") as f:
-        conteudo = f.read()
-
-    # Sobrescreve o padrão do Streamlit para mudar o peso da fonte dos botões
-    st.markdown("""
-    <style>
-    .st-key-bold button p {
-        font-weight: 800;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    try:
+        with open(caminho, mode="r", encoding="utf-8") as f:
+            conteudo = f.read()
+    except (OSError, UnicodeError) as erro:
+        st.warning(f"Não foi possível abrir o relatório: {erro}")
+        st.stop()
 
     st.sidebar.download_button(
         "Baixar Relatório (.md)",
@@ -88,14 +74,6 @@ else:
         width='stretch',
         key="bold"
     )
-
-    # Placeholder para a função de exportar em diferentes formatos, ainda não configurada
-    # st.menu_button(
-    #     "Exportar Relatório",
-    #     options=["PDF", "MARKDOWN"],
-    #     type="primary",
-    #     disabled=True
-    # )
 
     st.divider()
     st.markdown(conteudo)

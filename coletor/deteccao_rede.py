@@ -92,7 +92,7 @@ def detectar_gateway() -> str:
             match = re.search(r"default via (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", resultado.stdout)
             if match:
                 return match.group(1)
-    except Exception as erro:
+    except (OSError, subprocess.SubprocessError) as erro:
         print(f"Aviso: falha ao detectar gateway — {type(erro).__name__}: {erro}")
 
     return None
@@ -144,7 +144,7 @@ def detectar_tipo_conexao() -> str:
                 # (tun, tap, ppp, wg, usb) não são nenhum dos dois tipos.
                 if not re.match(r"^(tun|tap|ppp|wg|usb)", dispositivo):
                     return "ethernet"
-    except Exception as erro:
+    except (OSError, subprocess.SubprocessError) as erro:
         print(f"Aviso: falha ao detectar tipo de conexão — {type(erro).__name__}: {erro}")
 
     return None
@@ -226,7 +226,7 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
             comando, capture_output=True, text=True, errors="replace", timeout=30,
             env=None if sistema == "Windows" else _env_idioma_neutro(),
         )
-    except Exception as erro:
+    except (OSError, subprocess.SubprocessError) as erro:
         print(f"Aviso: falha ao executar traceroute/tracepath — {type(erro).__name__}: {erro}")
         return None
 
@@ -234,8 +234,10 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
         return _primeiro_salto_publico_tracert(resultado.stdout, destino)
 
     for linha in resultado.stdout.splitlines():
+        if not re.match(r"^\s*\d+[?:]?\s", linha):
+            continue
         for ip in _extrair_ips_da_linha(linha):
-            if _eh_ip_publico(ip):
+            if ip != destino and _eh_ip_publico(ip):
                 return ip
 
     return None

@@ -16,6 +16,16 @@ Cobre os requisitos funcionais:
 import pandas as pd
 from scipy import stats
 
+from armazenamento.armazenamento import CAMPOS
+
+
+def medicoes_vazias() -> pd.DataFrame:
+    return pd.DataFrame({
+        "timestamp": pd.Series(dtype="datetime64[ns]"),
+        "host": pd.Series(dtype="str"),
+        **{campo: pd.Series(dtype="float64") for campo in CAMPOS[2:]},
+    })
+
 
 def carregar_medicoes(caminho_csv: str) -> pd.DataFrame:
     """
@@ -24,7 +34,21 @@ def carregar_medicoes(caminho_csv: str) -> pd.DataFrame:
     latência é vazia (falhas de ping) são mantidas — a decisão de descartá-las
     ou não fica a cargo de cada análise específica, não do carregamento em si.
     """
-    df = pd.read_csv(caminho_csv, parse_dates=["timestamp"])
+    try:
+        df = pd.read_csv(caminho_csv)
+    except pd.errors.EmptyDataError:
+        return medicoes_vazias()
+    ausentes = set(CAMPOS) - set(df.columns)
+    if ausentes:
+        raise ValueError(f"Colunas ausentes no CSV: {', '.join(sorted(ausentes))}")
+    df["timestamp"] = pd.to_datetime(df["timestamp"], format="mixed", errors="raise")
+    if df["timestamp"].isna().any():
+        raise ValueError("O CSV contém medições sem timestamp.")
+    for campo in CAMPOS[2:]:
+        df[campo] = pd.to_numeric(df[campo], errors="raise")
+    # A última leitura e as linhas dos gráficos devem seguir a ordem cronológica.
+    if not df["timestamp"].is_monotonic_increasing:
+        df = df.sort_values("timestamp", kind="stable").reset_index(drop=True)
     return df
 
 
@@ -37,7 +61,11 @@ def calcular_estatisticas_descritivas(df: pd.DataFrame) -> dict:
     não fazem sentido em cálculos de tendência central — elas já são
     contabilizadas separadamente na coluna perda_pacotes_pct.
     """
-    latencias_validas = df["latencia_ms"].dropna()
+    latencias_validas = (
+        df["latencia_ms"].dropna()
+        if df is not None and "latencia_ms" in df
+        else pd.Series(dtype="float64")
+    )
 
     if latencias_validas.empty:
         return {
@@ -54,7 +82,7 @@ def calcular_estatisticas_descritivas(df: pd.DataFrame) -> dict:
         "quantidade_amostras": int(latencias_validas.count()),
         "media_ms": float(round(latencias_validas.mean(), 2)),
         "mediana_ms": float(round(latencias_validas.median(), 2)),
-        "desvio_padrao_ms": float(round(latencias_validas.std(), 2)),
+        "desvio_padrao_ms": float(round(latencias_validas.std(), 2)) if len(latencias_validas) > 1 else None,
         "percentis_ms": {
             "p25": float(round(percentis[0.25], 2)),
             "p50": float(round(percentis[0.50], 2)),
@@ -80,7 +108,9 @@ def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5, coluna: 
     incluindo as colunas 'limite_inferior' e 'limite_superior' usadas no cálculo,
     para facilitar a conferência/depuração dos resultados.
     """
-    df_validos = df.dropna(subset=[coluna]).copy()
+    if df is None or coluna not in df:
+        df = pd.DataFrame(columns=[coluna])
+    df_validos = df.dropna(subset=[coluna])
 
     q1 = df_validos[coluna].quantile(0.25)
     q3 = df_validos[coluna].quantile(0.75)
@@ -115,12 +145,13 @@ def calcular_correlacao_horario_latencia(df: pd.DataFrame) -> dict:
     é aceitável, mas vale mencioná-la como uma limitação conhecida caso o
     resultado pareça contraintuitivo.
     """
-    df_validos = df.dropna(subset=["latencia_ms"]).copy()
+    if df is None or not {"timestamp", "latencia_ms"}.issubset(df.columns):
+        df = medicoes_vazias()
+    df_validos = df.dropna(subset=["latencia_ms", "timestamp"]).copy()
     df_validos["hora_do_dia"] = df_validos["timestamp"].dt.hour
 
-    if df_validos["hora_do_dia"].nunique() < 2:
-        # Todas as medições caíram na mesma hora: não há variação suficiente
-        # para calcular uma correlação significativa.
+    if df_validos["hora_do_dia"].nunique() < 2 or df_validos["latencia_ms"].nunique() < 2:
+        # Horário ou latência constantes não permitem estimar uma correlação.
         return {
             "coeficiente_r": None,
             "p_valor": None,
@@ -140,10 +171,34 @@ def calcular_correlacao_horario_latencia(df: pd.DataFrame) -> dict:
     }
 
 
+def calcular_perda_pacotes_total(df: pd.DataFrame) -> float:
+    """Recalcula falhas sobre os dados brutos, independente dos reinícios da coleta."""
+    if df is None or df.empty or "latencia_ms" not in df:
+        return 0.0
+    return float(round(df["latencia_ms"].isna().sum() / len(df) * 100, 2))
+
+
+def resumir_medicoes(df: pd.DataFrame, detalhado: bool = False) -> dict:
+    """Compartilha o resumo sem calcular IQR e correlação quando o painel não os usa."""
+    resultado = {
+        "quantidade_medicoes": len(df) if df is not None else 0,
+        "estatisticas": calcular_estatisticas_descritivas(df),
+        "perda_total": calcular_perda_pacotes_total(df),
+    }
+    if detalhado:
+        resultado["quantidade_outliers"] = len(detectar_outliers_iqr(df))
+        resultado["correlacao"] = calcular_correlacao_horario_latencia(df)
+    return resultado
+
+
 if __name__ == "__main__":
     # Execução manual para teste rápido: python -m analise.estatisticas
     # Ajuste o caminho abaixo para um arquivo real gerado pela coleta.
-    df = carregar_medicoes("dados/wan_8.8.8.8_wifi.csv")
+    try:
+        df = carregar_medicoes("dados/wan_8.8.8.8_wifi.csv")
+    except (OSError, ValueError) as erro:
+        print(f"Não foi possível carregar as medições: {erro}")
+        raise SystemExit(1)
 
     estatisticas = calcular_estatisticas_descritivas(df)
     print(f"Amostras válidas: {estatisticas['quantidade_amostras']}")

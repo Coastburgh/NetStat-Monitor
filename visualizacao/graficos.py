@@ -15,10 +15,16 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 
-from analise.estatisticas import detectar_outliers_iqr
+from analise.estatisticas import (
+    detectar_outliers_iqr,
+    calcular_perda_pacotes_total,
+    medicoes_vazias,
+)
 
 
-def agregar_por_intervalo(df: pd.DataFrame, intervalo: str = "15min") -> pd.DataFrame:
+def agregar_por_intervalo(
+    df: pd.DataFrame, intervalo: str = "15min", coluna: str = "latencia_ms",
+) -> pd.DataFrame:
     """
     Agrega as medições por intervalo de tempo (padrão: 15 minutos), calculando
     a média da latência dentro de cada intervalo. Usado apenas para deixar
@@ -31,8 +37,10 @@ def agregar_por_intervalo(df: pd.DataFrame, intervalo: str = "15min") -> pd.Data
     de 15ms viraria uma média de ~22ms, mascarando o outlier). Esta função
     serve apenas para suavizar a exibição visual.
     """
+    if df is None or not {"timestamp", coluna}.issubset(df.columns):
+        df = medicoes_vazias()
     df_indexado = df.set_index("timestamp")
-    df_agregado = df_indexado["latencia_ms"].resample(intervalo).mean().reset_index()
+    df_agregado = df_indexado[coluna].resample(intervalo).mean().reset_index()
     return df_agregado
 
 
@@ -70,14 +78,16 @@ def gerar_grafico_serie_temporal(
     Retorna a figura do Plotly (além de salvar o arquivo), para permitir
     reaproveitá-la diretamente no dashboard Streamlit mais adiante.
     """
+    if df is None or not {"timestamp", coluna}.issubset(df.columns):
+        df = medicoes_vazias()
+
     if salvar_arquivo:
         pasta = os.path.dirname(caminho_saida)
-        if pasta and not os.path.exists(pasta):
-            os.makedirs(pasta)
+        if pasta:
+            os.makedirs(pasta, exist_ok=True)
 
     if agregacao:
-        df_indexado = df.set_index("timestamp")
-        df_plot = df_indexado[coluna].resample(agregacao).mean().reset_index()
+        df_plot = agregar_por_intervalo(df, agregacao, coluna)
     else:
         df_plot = df[["timestamp", coluna]]
 
@@ -145,12 +155,15 @@ def calcular_taxa_perda_por_janela(df: pd.DataFrame, janela: str = "5min") -> pd
     Retorna um DataFrame com uma linha por janela de tempo, contendo o
     percentual de falhas ocorridas apenas naquela janela específica.
     """
+    if df is None or not {"timestamp", "latencia_ms"}.issubset(df.columns):
+        df = medicoes_vazias()
     df_indexado = df.set_index("timestamp")
 
-    total_por_janela = df_indexado["latencia_ms"].resample(janela).count()
+    contagens = df_indexado["latencia_ms"].resample(janela).agg(["count", "size"])
+    total_por_janela = contagens["count"]
     # count() do pandas ignora NaN automaticamente, então isso já dá o
     # número de medições COM resposta em cada janela.
-    total_tentativas_por_janela = df_indexado["latencia_ms"].resample(janela).size()
+    total_tentativas_por_janela = contagens["size"]
     falhas_por_janela = total_tentativas_por_janela - total_por_janela
 
     taxa_perda = (falhas_por_janela / total_tentativas_por_janela * 100).round(2)
@@ -177,8 +190,8 @@ def gerar_grafico_taxa_perda_pacotes(
     """
     if salvar_arquivo:
         pasta = os.path.dirname(caminho_saida)
-        if pasta and not os.path.exists(pasta):
-            os.makedirs(pasta)
+        if pasta:
+            os.makedirs(pasta, exist_ok=True)
 
     df_taxa = calcular_taxa_perda_por_janela(df, janela)
 
@@ -205,33 +218,15 @@ def gerar_grafico_taxa_perda_pacotes(
     return fig
 
 
-def calcular_perda_pacotes_total(df: pd.DataFrame) -> float:
-    """
-    Calcula a taxa de perda de pacotes total do arquivo, recalculada
-    diretamente a partir dos dados brutos (contagem de falhas / total de
-    linhas), em vez de usar a coluna 'perda_pacotes_pct' já calculada.
-
-    Isso é mais robusto que simplesmente pegar o valor da última linha:
-    se a coleta foi interrompida e retomada em múltiplas sessões, o
-    contador interno do coletor reinicia a cada execução, fazendo a
-    coluna 'perda_pacotes_pct' refletir apenas a última sessão, não o
-    arquivo inteiro. Este cálculo independe de quantas sessões geraram
-    o arquivo.
-    """
-    total_linhas = len(df)
-    total_falhas = df["latencia_ms"].isna().sum()
-
-    if total_linhas == 0:
-        return 0.0
-
-    return float(round((total_falhas / total_linhas) * 100, 2))
-
-
 if __name__ == "__main__":
     # Execução manual para teste rápido: python -m visualizacao.graficos
     from analise.estatisticas import carregar_medicoes
  
-    df = carregar_medicoes("dados/wan_8.8.8.8_ethernet.csv")
+    try:
+        df = carregar_medicoes("dados/wan_8.8.8.8_ethernet.csv")
+    except (OSError, ValueError) as erro:
+        print(f"Não foi possível carregar as medições: {erro}")
+        raise SystemExit(1)
     gerar_grafico_serie_temporal(
         df,
         coluna="latencia_ms",
