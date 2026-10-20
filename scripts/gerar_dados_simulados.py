@@ -23,7 +23,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from armazenamento.armazenamento import CAMPOS
+from armazenamento.armazenamento import CAMPOS, PASTA_DADOS
 
 
 def gerar_medicoes_simuladas(
@@ -111,10 +111,10 @@ if __name__ == "__main__":
 
     cenarios = [
         # (host, arquivo, latência base, variação, tipo de conexão)
-        ("8.8.8.8", "dados/wan_8.8.8.8_wifi.csv", 15.0, 4.0),
-        ("8.8.8.8", "dados/wan_8.8.8.8_ethernet.csv", 9.0, 2.0),  # ethernet: mais estável e rápido
-        ("1.1.1.1", "dados/wan_1.1.1.1_wifi.csv", 12.0, 3.5),
-        ("172.20.10.1", "dados/lan_172.20.10.1_wifi.csv", 3.0, 1.0),
+        ("8.8.8.8", os.path.join(PASTA_DADOS, "wan_8.8.8.8_wifi.csv"), 15.0, 4.0),
+        ("8.8.8.8", os.path.join(PASTA_DADOS, "wan_8.8.8.8_ethernet.csv"), 9.0, 2.0),  # ethernet: mais estável e rápido
+        ("1.1.1.1", os.path.join(PASTA_DADOS, "wan_1.1.1.1_wifi.csv"), 12.0, 3.5),
+        ("172.20.10.1", os.path.join(PASTA_DADOS, "lan_172.20.10.1_wifi.csv"), 3.0, 1.0),
     ]
 
     for host, caminho, base, variacao in cenarios:

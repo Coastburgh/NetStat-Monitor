@@ -21,6 +21,12 @@ class InterfaceTest(unittest.TestCase):
         self.anterior = Path.cwd()
         os.chdir(self.temporario.name)
         self.addCleanup(os.chdir, self.anterior)
+        pasta_dados = str(Path(self.temporario.name) / "dados")
+        for modulo in ("armazenamento.armazenamento", "analise.gerar_relatorio"):
+            for campo, valor in (("PASTA_DADOS", pasta_dados), ("PASTA_RELATORIOS", str(Path(pasta_dados) / "relatorios"))):
+                substituicao = patch(f"{modulo}.{campo}", valor)
+                substituicao.start()
+                self.addCleanup(substituicao.stop)
         self.logo = patch("streamlit.logo")
         self.logo.start()
         self.addCleanup(self.logo.stop)
@@ -43,6 +49,17 @@ class InterfaceTest(unittest.TestCase):
             ), encoding="utf-8",
         )
         return caminho
+
+    def test_logos_usam_recursos_do_projeto_fora_da_pasta_de_execucao(self):
+        with patch("streamlit.logo") as logo:
+            at = self.app().run()
+        self.assertFalse(at.exception)
+        principal = Path(logo.call_args.args[0])
+        icone = Path(logo.call_args.kwargs["icon_image"])
+        for caminho in (principal, icone):
+            self.assertTrue(caminho.is_absolute())
+            self.assertEqual(caminho.parent, APP.parent / "assets")
+            self.assertTrue(caminho.is_file())
 
     def test_nova_sessao_pode_abrir_relatorio_diretamente(self):
         at = self.app().switch_page("paginas/relatorio.py").run()

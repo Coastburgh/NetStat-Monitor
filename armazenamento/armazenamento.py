@@ -8,12 +8,49 @@ import csv
 import os
 import ipaddress
 import re
+import sys
+from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote, unquote
 
 
 CAMPOS = ["timestamp", "host", "latencia_ms", "jitter_ms", "perda_pacotes_pct"]
-PASTA_DADOS = "dados"
+
+
+def obter_pasta_dados() -> str:
+    """Resolve o destino no início do processo, sem depender da pasta de execução.
+
+    NETSTAT_PASTA_DADOS permite isolar testes ou manter dados portáteis.
+    NETSTAT_AMBIENTE=producao seleciona o perfil de uso normal; o padrão
+    desenvolvimento evita misturar experimentos com medições reais.
+    """
+    personalizada = os.environ.get("NETSTAT_PASTA_DADOS", "").strip()
+    if personalizada:
+        caminho = Path(personalizada).expanduser()
+        if not caminho.is_absolute():
+            raise ValueError("NETSTAT_PASTA_DADOS deve ser um caminho absoluto.")
+        return str(caminho)
+
+    ambiente = os.environ.get("NETSTAT_AMBIENTE", "").strip() or "desenvolvimento"
+    if ambiente not in ("desenvolvimento", "producao"):
+        raise ValueError("NETSTAT_AMBIENTE deve ser desenvolvimento ou producao.")
+    desenvolvimento = ambiente == "desenvolvimento"
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+        if not base.is_absolute():
+            base = Path.home() / "AppData" / "Local"
+        nome = "NetStat-Dev" if desenvolvimento else "NetStat"
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+        nome = "NetStat-Dev" if desenvolvimento else "NetStat"
+    else:
+        xdg = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+        base = xdg if xdg.is_absolute() else Path.home() / ".local" / "share"
+        nome = "netstat-dev" if desenvolvimento else "netstat"
+    return str(base / nome / "dados")
+
+
+PASTA_DADOS = obter_pasta_dados()
 PASTA_RELATORIOS = os.path.join(PASTA_DADOS, "relatorios")
 PADRAO_NOME_ARQUIVO = re.compile(
     r"^(?P<camada>lan|man|wan)_(?P<host>.+)_(?P<sessao>wifi|ethernet)\.csv$"
@@ -80,12 +117,12 @@ def validar_host(host: str) -> str:
     return host
 
 
-def caminho_coleta(camada: str, host: str, tipo: str, pasta: str = PASTA_DADOS) -> str:
+def caminho_coleta(camada: str, host: str, tipo: str, pasta: str | None = None) -> str:
     if camada not in ROTULOS_CAMADA:
         raise ValueError("Camada de rede inválida.")
     # Codificação reversível mantém IPv6 utilizável em nomes de arquivo no Windows.
     endereco = quote(validar_host(host), safe=".-")
-    return os.path.join(pasta, f"{camada}_{endereco}_{normalizar_tipo_conexao(tipo)}.csv")
+    return os.path.join(PASTA_DADOS if pasta is None else pasta, f"{camada}_{endereco}_{normalizar_tipo_conexao(tipo)}.csv")
 
 
 def extrair_metadados_nome_arquivo(nome_arquivo: str) -> dict:
@@ -103,8 +140,8 @@ def extrair_metadados_nome_arquivo(nome_arquivo: str) -> dict:
 class ArmazenamentoCSV:
     """Salva cada medição como uma nova linha em um arquivo CSV."""
 
-    def __init__(self, caminho_arquivo: str = "dados/medicoes.csv"):
-        self.caminho_arquivo = caminho_arquivo
+    def __init__(self, caminho_arquivo: str | None = None):
+        self.caminho_arquivo = os.path.join(PASTA_DADOS, "medicoes.csv") if caminho_arquivo is None else caminho_arquivo
         self._garantir_diretorio()
         self._garantir_cabecalho()
 

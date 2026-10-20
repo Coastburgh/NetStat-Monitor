@@ -276,7 +276,10 @@ if __name__ == "__main__":
     # Execução manual para teste rápido: python -m analise.estatisticas
     # Ajuste o caminho abaixo para um arquivo real gerado pela coleta.
     try:
-        df = carregar_medicoes("dados/wan_8.8.8.8_wifi.csv")
+        from armazenamento.armazenamento import PASTA_DADOS
+        from pathlib import Path
+
+        df = carregar_medicoes(Path(PASTA_DADOS) / "wan_8.8.8.8_wifi.csv")
     except (OSError, ValueError) as erro:
         print(f"Não foi possível carregar as medições: {erro}")
         raise SystemExit(1)

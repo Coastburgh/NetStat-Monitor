@@ -4,7 +4,7 @@ import math
 import threading
 import time
 
-from armazenamento.armazenamento import ArmazenamentoCSV, PASTA_DADOS, caminho_coleta
+from armazenamento.armazenamento import ArmazenamentoCSV, caminho_coleta
 from coletor.ping_collector import PingCollector
 
 
@@ -41,7 +41,7 @@ class ControladorColeta:
                     del self._eventos[camada]
             return list(self._threads)
 
-    def iniciar(self, hosts: dict, tipo: str, intervalo: float, pasta: str = PASTA_DADOS) -> bool:
+    def iniciar(self, hosts: dict, tipo: str, intervalo: float, pasta: str | None = None) -> bool:
         if not hosts:
             raise ValueError("Informe ao menos um host para a coleta.")
         if not isinstance(intervalo, (int, float)) or not math.isfinite(intervalo) or intervalo <= 0:

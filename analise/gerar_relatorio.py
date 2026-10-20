@@ -552,7 +552,7 @@ def _secao_metodologia() -> str:
     ])
 
 
-def gerar_relatorio_consolidado(pasta_dados: str = PASTA_DADOS) -> str:
+def gerar_relatorio_consolidado(pasta_dados: str | None = None) -> str:
     """
     Gera o relatório consolidado em Markdown a partir de todos os CSVs da
     pasta de dados, ordenados por nome de arquivo.
@@ -560,6 +560,7 @@ def gerar_relatorio_consolidado(pasta_dados: str = PASTA_DADOS) -> str:
     Arquivos vazios, sem medições válidas ou fora do padrão de nomeação
     não interrompem a geração: entram no relatório com uma nota apropriada.
     """
+    pasta_dados = PASTA_DADOS if pasta_dados is None else pasta_dados
     arquivos_csv = listar_arquivos(pasta_dados, ".csv")
 
     data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -609,11 +610,12 @@ def gerar_relatorio_consolidado(pasta_dados: str = PASTA_DADOS) -> str:
     return "\n".join(linhas)
 
 
-def salvar_relatorio(conteudo: str, pasta_relatorios: str = PASTA_RELATORIOS) -> str:
+def salvar_relatorio(conteudo: str, pasta_relatorios: str | None = None) -> str:
     """
     Salva o relatório em Markdown dentro da pasta de relatórios, com nome
     contendo o momento da geração, e retorna o caminho completo do arquivo.
     """
+    pasta_relatorios = PASTA_RELATORIOS if pasta_relatorios is None else pasta_relatorios
     os.makedirs(pasta_relatorios, exist_ok=True)
     nome_arquivo = f"relatorio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
     caminho = os.path.join(pasta_relatorios, nome_arquivo)

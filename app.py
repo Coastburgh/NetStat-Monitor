@@ -10,13 +10,15 @@ navegação e as ações comuns do painel (Monitor e Relatório).
 import streamlit as st
 import os
 import signal
+from pathlib import Path
 from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
 from armazenamento.armazenamento import PASTA_DADOS, listar_arquivos
 from paginas.recursos import inicializar_estado, obter_controlador
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
 
-st.logo("assets/NS_logo_long.png", size="large", icon_image="assets/NS_logo_square.png")
+pasta_assets = Path(__file__).resolve().parent / "assets"
+st.logo(str(pasta_assets / "NS_logo_long.png"), size="large", icon_image=str(pasta_assets / "NS_logo_square.png"))
 
 # Sobrescreve o padrão do Streamlit para mudar a cor e peso da fonte dos botões
 st.html("""
