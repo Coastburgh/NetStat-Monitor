@@ -271,10 +271,10 @@ class InterfaceTest(unittest.TestCase):
         at.button(key="gerar").click().run()
         self.assertFalse(at.exception)
         self.assertEqual(at.header[0].value, "Preview Relatório Consolidado")
-        self.assertEqual(len(at.get("download_button")), 2)
+        self.assertEqual(len(at.get("download_button")), 3)
         self.assertEqual(
             [botao.label for botao in at.get("download_button")],
-            ["Markdown (.md)", "PDF (.pdf)"],
+            ["Markdown (.md)", "PDF (.pdf)", "HTML (.html)"],
         )
         self.assertIn("Relatório consolidado", at.markdown[-1].value)
         self.assertEqual(len(list(Path("dados/relatorios").glob("*.md"))), 1)
@@ -292,7 +292,20 @@ class InterfaceTest(unittest.TestCase):
         self.assertTrue(at.warning)
         self.assertEqual(
             [botao.label for botao in at.get("download_button")],
-            ["Markdown (.md)"],
+            ["Markdown (.md)", "HTML (.html)"],
+        )
+
+    def test_falha_na_exportacao_html_mantem_outros_formatos_disponiveis(self):
+        pasta = Path("dados/relatorios")
+        pasta.mkdir(parents=True)
+        (pasta / "relatorio_20261017_120001.md").write_text("# Relatório", encoding="utf-8")
+        with patch("analise.gerar_relatorio.exportar_relatorio_html", side_effect=ValueError("inválido")):
+            at = self.app().switch_page("paginas/relatorio.py").run()
+        self.assertFalse(at.exception)
+        self.assertIn("Não foi possível gerar o HTML", at.warning[-1].value)
+        self.assertEqual(
+            [botao.label for botao in at.get("download_button")],
+            ["Markdown (.md)", "PDF (.pdf)"],
         )
 
     def test_relatorios_no_mesmo_minuto_permanecem_acessiveis(self):
