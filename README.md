@@ -17,11 +17,11 @@ A ideia central é permitir que uma mesma sessão de coleta compare diferentes c
 
 ## Requisitos
 
-- Python 3.10 ou superior;
+- Python 3.12 ou superior, conforme os requisitos das dependências fixadas;
 - pip;
 - ambiente virtual recomendado.
 
-Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `requirements.txt` contém a lista completa.
+Dependências principais: streamlit, pandas, scipy, plotly e reportlab. O arquivo `requirements.txt` contém as dependências diretas e suas versões; numpy é instalado como dependência transitiva.
 
 ## Instalação
 
@@ -53,13 +53,23 @@ Dependências principais: streamlit, pandas, numpy, scipy e plotly. O arquivo `r
 
 4. Instale as dependências:
 
-       pip install -r requirements.txt
+       python -m pip install -r requirements.txt
 
 ## Execução
 
 ### Painel Streamlit
 
-    streamlit run app.py
+    python -m streamlit run app.py
+
+Execute a partir da raiz do projeto. Os comandos com `python` pressupõem que a `.venv` esteja ativada. Sem ativá-la, utilize diretamente seu interpretador:
+
+Windows (PowerShell):
+
+    .\.venv\Scripts\python.exe -m streamlit run app.py
+
+Linux/macOS:
+
+    .venv/bin/python -m streamlit run app.py
 
 Na interface, é possível:
 
@@ -68,7 +78,7 @@ Na interface, é possível:
 - iniciar e interromper uma coleta;
 - encerrar a aplicação diretamente pelo painel (botão "ENCERRAR" na barra lateral);
 - visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura;
-- gerar o relatório consolidado (req. 20) e visualizá-lo em uma página exclusiva, com preview e download.
+- gerar o relatório consolidado (req. 20) e visualizá-lo em uma página exclusiva, com preview e exportação em Markdown, PDF e HTML.
 
 ### Detecção automática de rede
 
@@ -87,6 +97,78 @@ Para testes rápidos do módulo de coleta:
 Para gerar o relatório consolidado diretamente pelo terminal (sem o painel):
 
     python -m analise.gerar_relatorio
+
+## Dados, ambientes e configurações
+
+Por padrão, a execução utiliza o ambiente `desenvolvimento`. Os dados são gravados no perfil do usuário, independentemente do diretório de execução:
+
+| Sistema | Desenvolvimento (padrão) | Produção |
+|---|---|---|
+| Windows | `%LOCALAPPDATA%\NetStat-Dev\dados` | `%LOCALAPPDATA%\NetStat\dados` |
+| Linux | `~/.local/share/netstat-dev/dados` | `~/.local/share/netstat/dados` |
+| macOS | `~/Library/Application Support/NetStat-Dev/dados` | `~/Library/Application Support/NetStat/dados` |
+
+No Linux, um `XDG_DATA_HOME` absoluto substitui a base `~/.local/share`. No Windows, se `LOCALAPPDATA` estiver ausente ou não for absoluto, a base utilizada é `~/AppData/Local`. As mudanças foram validadas manualmente no Windows e Linux; a execução nativa no macOS ainda não foi validada.
+
+### Seleção do ambiente
+
+`NETSTAT_AMBIENTE` aceita `desenvolvimento` e `producao` (sem acento). Ausente ou vazia, utiliza `desenvolvimento`. Para selecionar produção:
+
+Windows (PowerShell, com a `.venv` ativada):
+
+    $env:NETSTAT_AMBIENTE = "producao"
+    python -m streamlit run app.py
+
+Após encerrar o programa, remova a variável para voltar ao padrão nesta sessão do terminal:
+
+    Remove-Item Env:NETSTAT_AMBIENTE
+
+Linux/macOS (com a `.venv` ativada; a variável vale apenas para esse comando):
+
+    NETSTAT_AMBIENTE=producao python -m streamlit run app.py
+
+### Diretório personalizado e dados existentes
+
+`NETSTAT_PASTA_DADOS` define diretamente a pasta de dados e tem prioridade sobre `NETSTAT_AMBIENTE`. O caminho deve ser absoluto; a variável não vazia é usada sem acrescentar outra pasta `dados`. A escolha é lida ao iniciar o processo: reinicie o programa para aplicar mudanças.
+
+Os arquivos antigos na pasta `dados/` do projeto não são movidos nem excluídos automaticamente. Para continuar usando essa pasta:
+
+Windows (PowerShell, com a `.venv` ativada; `Resolve-Path` exige que a pasta já exista):
+
+    $env:NETSTAT_PASTA_DADOS = (Resolve-Path .\dados).Path
+    python -m streamlit run app.py
+
+Após encerrar o programa, remova a configuração desta sessão do terminal:
+
+    Remove-Item Env:NETSTAT_PASTA_DADOS
+
+Linux/macOS (com a `.venv` ativada, a partir da raiz do projeto):
+
+    NETSTAT_PASTA_DADOS="$(pwd)/dados" python -m streamlit run app.py
+
+### Persistência das configurações
+
+Os hosts LAN, MAN e WAN, o tipo de conexão, o intervalo e o modo automático são salvos a cada alteração em `configuracao.json`, dentro da pasta de dados selecionada. Os relatórios gerados ficam na subpasta `relatorios/`.
+
+Ao reiniciar o processo, os campos são restaurados, mas a coleta permanece parada até ser iniciada pelo usuário. A ação "Limpar Configuração" também é persistida. Arquivo ausente utiliza os valores padrão; configurações inválidas ou falhas de leitura e gravação são informadas no painel. Uma falha de gravação mantém os valores em memória durante a execução.
+
+## Testes
+
+A partir da raiz do projeto, com a `.venv` ativada:
+
+    python -m unittest discover -s tests -q
+
+Sem ativar a `.venv`, utilize:
+
+Windows (PowerShell):
+
+    .\.venv\Scripts\python.exe -m unittest discover -s tests -q
+
+Linux/macOS:
+
+    .venv/bin/python -m unittest discover -s tests -q
+
+Os testes usam diretórios temporários para isolar os arquivos gerados dos dados de uso normal.
 
 ## Fluxo de uso típico
 
@@ -124,7 +206,8 @@ Durante a construção do projeto, alguns planos iniciais foram ajustados:
 - identificação de outliers por IQR (req. 13) — z-score (req. 12) avaliado e removido;
 - destaque visual de outliers por IQR nos gráficos de série temporal, ativável por toggle no painel (req. 18);
 - correlação entre horário do dia e latência (req. 14);
-- geração automatizada de relatório consolidado em Markdown (req. 20), com página exclusiva no painel para preview e download;
+- geração automatizada de relatório consolidado em Markdown (req. 20), com página exclusiva no painel para preview e exportação em Markdown, PDF e HTML;
+- separação de dados por ambiente e persistência das configurações entre reinícios;
 - geração de dados simulados para desenvolvimento e testes.
 
 ## Formato dos dados
@@ -135,7 +218,7 @@ Cada linha de CSV representa uma medição, com o seguinte esquema:
 
 O tipo de conexão não é uma coluna do CSV: ele é registrado no nome do arquivo, no formato:
 
-    dados/{rotulo_camada}_{host}_{rotulo_sessao}.csv
+    {pasta_de_dados}/{rotulo_camada}_{host}_{rotulo_sessao}.csv
 
 Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `man` e `wan`; os rótulos de sessão armazenados são `wifi` e `ethernet`, exibidos como "Wi-Fi" e "Ethernet". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
 
@@ -167,7 +250,7 @@ Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `m
 - a coleta em múltiplos hosts utiliza threads, com `threading.Event` para permitir parar cada uma de forma controlada a partir da interface (necessário para o botão "Parar" do Streamlit, já que não há Ctrl+C dentro do navegador);
 - a detecção de rede usa PowerShell (`Get-NetRoute`) no Windows e `ip route` no Linux para o gateway; `tracert -d` (Windows), `tracepath` (Linux) ou `traceroute` (macOS) para o primeiro salto externo. No Windows, a leitura não depende do idioma do sistema (objetos do PowerShell e linhas de salto do `tracert`, sem rótulos traduzidos); no Linux e no macOS, os comandos rodam com `LC_ALL=C`;
 - a detecção do tipo de conexão cruza a rota padrão com o tipo físico da interface: no Windows, lê `PhysicalMediaType` do adaptador via PowerShell (`Native 802.11` = Wi-Fi, `802.3` = Ethernet); no Linux, extrai o dispositivo de `ip route show default` e verifica a existência de `/sys/class/net/<dev>/phy80211` (presente apenas em interfaces Wi-Fi), sem depender de `iw`/`iwconfig`. Interfaces virtuais (VPN, tethering) não são classificadas;
-- a pasta `dados/` está no `.gitignore`, o que inclui CSVs reais e simulados;
+- a pasta legada `dados/` do projeto está no `.gitignore`; por padrão, CSVs, relatórios e configurações ficam no perfil do usuário, conforme a seção "Dados, ambientes e configurações";
 - `scripts/gerar_dados_simulados.py` gera dados sintéticos para permitir o desenvolvimento sem depender do acúmulo de coletas reais.
 
 ## Estrutura do projeto
@@ -178,7 +261,7 @@ Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `m
 - armazenamento/ — persistência dos dados coletados;
 - analise/ — cálculo estatístico, identificação de padrões e geração do relatório consolidado;
 - visualizacao/ — gráficos e visualizações;
-- dados/ — arquivos CSV gerados pelas coletas (ignorado pelo Git);
+- dados/ — pasta legada de medições, ignorada pelo Git; pode ser selecionada explicitamente com `NETSTAT_PASTA_DADOS`;
 - scripts/ — utilitários de apoio e geração de dados simulados.
 
 Todas as pastas de código possuem `__init__.py`.
@@ -198,13 +281,15 @@ Todas as pastas de código possuem `__init__.py`.
 - [x] detecção de outliers por IQR (req. 13);
 - [x] correlação entre horário e latência (req. 14);
 - [x] destaque visual de outliers nos gráficos de série temporal (req. 18), ativável por toggle no painel;
-- [x] geração automatizada de relatório consolidado (req. 20).
+- [x] geração automatizada de relatório consolidado (req. 20), com exportação em Markdown, PDF e HTML;
+- [x] separação de dados de desenvolvimento e produção;
+- [x] persistência das configurações entre reinícios.
 
 ### Pendente
 
 - [ ] coleta extensiva em múltiplos dias para validação real;
 - [ ] comparação mais aprofundada entre Wi-Fi e Ethernet;
-- [ ] refinamento das visualizações e exportação de relatórios;
+- [ ] refinamento das visualizações;
 - [ ] captura e inspeção de tráfego com Wireshark (atividade manual, planejada para a etapa de relatório final).
 
 ### Fora do escopo confirmado
