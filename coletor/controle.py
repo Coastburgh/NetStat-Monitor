@@ -49,6 +49,7 @@ class ControladorColeta:
         self._lock = threading.RLock()
         self._threads = {}
         self._eventos = {}
+        self._encerrando = False
         self._configuracao = configuracao_padrao()
         self._caminho_configuracao = caminho_configuracao
         self.aviso_configuracao = None
@@ -95,6 +96,8 @@ class ControladorColeta:
             for camada, host in hosts.items()
         }
         with self._lock:
+            if self._encerrando:
+                raise RuntimeError("O aplicativo está sendo encerrado; não é possível iniciar uma coleta.")
             if self.camadas_ativas():
                 return False
             # Prepara todos os arquivos antes de iniciar qualquer thread.
@@ -118,6 +121,12 @@ class ControladorColeta:
                     evento.set()
                 raise
             return True
+
+    def encerrar(self, timeout: float = 5.0) -> bool:
+        """Impede novos inícios antes de aguardar a parada das threads existentes."""
+        with self._lock:
+            self._encerrando = True
+        return self.parar(timeout)
 
     def parar(self, timeout: float = 5.0) -> bool:
         with self._lock:

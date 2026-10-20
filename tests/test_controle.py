@@ -104,6 +104,34 @@ class ControleTest(unittest.TestCase):
             self.controle.iniciar({"wan": "8.8.8.8"}, "wifi", 5, self.pasta)
         self.assertEqual(self.controle.camadas_ativas(), [])
 
+    def test_encerramento_sem_coleta_e_repetivel_e_impede_novos_inicios(self):
+        self.assertTrue(self.controle.encerrar())
+        self.assertTrue(self.controle.encerrar())
+        with self.assertRaisesRegex(RuntimeError, "encerrado"):
+            self.controle.iniciar({"wan": "8.8.8.8"}, "wifi", 5, self.pasta)
+        self.assertEqual(list(Path(self.pasta).iterdir()), [])
+
+    def test_encerramento_lento_preserva_threads_e_impede_reinicio(self):
+        entrou = threading.Event()
+        liberar = threading.Event()
+        self.addCleanup(liberar.set)
+
+        def medir(coletor):
+            entrou.set()
+            liberar.wait(3)
+            return {"host": coletor.host, "latencia_ms": 10, "jitter_ms": None, "perda_pacotes_pct": 0}
+
+        with patch.object(PingCollector, "coletar_uma_medicao", medir):
+            self.controle.iniciar({"wan": "8.8.8.8"}, "wifi", 30, self.pasta)
+            self.assertTrue(entrou.wait(2))
+            self.assertFalse(self.controle.encerrar(timeout=0))
+            self.assertEqual(self.controle.camadas_ativas(), ["wan"])
+            with self.assertRaises(RuntimeError):
+                self.controle.iniciar({"wan": "1.1.1.1"}, "wifi", 5, self.pasta)
+            liberar.set()
+            self.assertTrue(self.controle.encerrar())
+            self.assertEqual(self.controle.camadas_ativas(), [])
+
     def test_comando_e_locale_por_sistema(self):
         for sistema, comando in [
             ("Windows", ["ping", "-n", "1", "-w", "2000", "8.8.8.8"]),

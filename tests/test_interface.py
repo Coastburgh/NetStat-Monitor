@@ -397,13 +397,29 @@ class InterfaceTest(unittest.TestCase):
         self.assertFalse(at.exception)
         self.assertTrue(at.error)
 
-    def test_encerrar_sinaliza_controlador_e_usa_sigterm(self):
+    def test_encerrar_sinaliza_controlador_antes_de_solicitar_parada_do_servidor(self):
+        import signal
+
         at = self.app().run()
-        with patch("os.kill") as encerrar, patch.object(obter_controlador(), "parar", return_value=True) as parar:
+        chamadas = []
+        with patch("signal.raise_signal", side_effect=lambda sinal: chamadas.append(sinal)) as encerrar, patch.object(obter_controlador(), "encerrar", side_effect=lambda: chamadas.append("coleta") or True) as parar:
             at.button(key="encerrar").click().run()
         self.assertFalse(at.exception)
         parar.assert_called_once()
-        encerrar.assert_called_once()
+        encerrar.assert_called_once_with(signal.SIGINT)
+        self.assertEqual(chamadas, ["coleta", signal.SIGINT])
+
+    def test_parada_incompleta_nao_envia_sinal_e_permite_tentar_novamente(self):
+        at = self.app().run()
+        with patch("signal.raise_signal") as sinal, patch.object(obter_controlador(), "encerrar", return_value=False):
+            at.button(key="encerrar").click().run()
+        self.assertFalse(at.exception)
+        sinal.assert_not_called()
+        self.assertTrue(any("ainda está encerrando" in aviso.value for aviso in at.warning))
+        with patch("signal.raise_signal") as sinal:
+            at.button(key="encerrar").click().run()
+        self.assertFalse(at.exception)
+        sinal.assert_called_once()
 
     def test_reinicio_do_controlador_restaura_widgets(self):
         at = self.app().run()
