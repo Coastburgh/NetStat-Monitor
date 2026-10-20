@@ -4,7 +4,9 @@ import math
 import threading
 import time
 
-from armazenamento.armazenamento import ArmazenamentoCSV, caminho_coleta
+from armazenamento.armazenamento import (
+    ArmazenamentoCSV, caminho_coleta, carregar_configuracao, salvar_configuracao, validar_host,
+)
 from coletor.ping_collector import PingCollector
 
 
@@ -15,14 +17,49 @@ def configuracao_padrao() -> dict:
     }
 
 
+def _validar_configuracao_salva(valores: dict) -> dict:
+    """Descarta campos inválidos antes que sejam usados pelos widgets."""
+    configuracao = configuracao_padrao()
+    for campo in ("lan", "man", "wan"):
+        valor = valores.get(campo)
+        if isinstance(valor, str):
+            try:
+                configuracao[campo] = validar_host(valor) if valor.strip() else ""
+            except ValueError:
+                pass
+    if valores.get("tipo_conexao") in ("WiFi", "Ethernet"):
+        configuracao["tipo_conexao"] = valores["tipo_conexao"]
+    intervalo = valores.get("intervalo")
+    if isinstance(intervalo, (int, float)) and not isinstance(intervalo, bool):
+        try:
+            intervalo = float(intervalo)
+        except OverflowError:
+            intervalo = 0.0
+        if math.isfinite(intervalo) and intervalo >= 5.0:
+            configuracao["intervalo"] = intervalo
+    if isinstance(valores.get("automatica"), bool):
+        configuracao["automatica"] = valores["automatica"]
+    return configuracao
+
+
 class ControladorColeta:
     """Serializa início/parada e preserva referências até cada thread terminar."""
 
-    def __init__(self):
+    def __init__(self, caminho_configuracao: str | None = None):
         self._lock = threading.RLock()
         self._threads = {}
         self._eventos = {}
         self._configuracao = configuracao_padrao()
+        self._caminho_configuracao = caminho_configuracao
+        self.aviso_configuracao = None
+        if caminho_configuracao is not None:
+            try:
+                valores = carregar_configuracao(caminho_configuracao)
+                self._configuracao = _validar_configuracao_salva(valores)
+                if any(self._configuracao.get(campo) != valor for campo, valor in valores.items()):
+                    self.aviso_configuracao = "A configuração salva contém campos inválidos; os valores padrão foram usados nesses campos."
+            except (OSError, ValueError) as erro:
+                self.aviso_configuracao = f"Não foi possível ler a configuração salva; usando os valores padrão: {erro}"
 
     def ler_configuracao(self) -> dict:
         with self._lock:
@@ -32,6 +69,13 @@ class ControladorColeta:
         with self._lock:
             if not self.camadas_ativas():
                 self._configuracao.update(valores)
+                if self._caminho_configuracao is not None:
+                    try:
+                        salvar_configuracao(self._configuracao, self._caminho_configuracao)
+                    except (OSError, ValueError, TypeError) as erro:
+                        self.aviso_configuracao = f"A configuração foi mantida nesta execução, mas não pôde ser salva: {erro}"
+                    else:
+                        self.aviso_configuracao = None
 
     def camadas_ativas(self) -> list[str]:
         with self._lock:

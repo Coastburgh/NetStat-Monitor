@@ -405,6 +405,25 @@ class InterfaceTest(unittest.TestCase):
         parar.assert_called_once()
         encerrar.assert_called_once()
 
+    def test_reinicio_do_controlador_restaura_widgets(self):
+        at = self.app().run()
+        at.text_input(key="wan_destino_input").set_value("1.1.1.1").run()
+        at.number_input(key="intervalo_input").set_value(12.0).run()
+        obter_controlador.clear()
+        novo = self.app().run()
+        self.assertFalse(novo.exception)
+        self.assertEqual(novo.text_input(key="wan_destino_input").value, "1.1.1.1")
+        self.assertEqual(novo.number_input(key="intervalo_input").value, 12.0)
+        self.assertFalse(novo.session_state.coleta_ativa)
+
+    def test_falha_de_persistencia_avisa_e_preserva_widget(self):
+        at = self.app().run()
+        with patch("coletor.controle.salvar_configuracao", side_effect=PermissionError("sem acesso")):
+            at.text_input(key="wan_destino_input").set_value("1.1.1.1").run()
+        self.assertFalse(at.exception)
+        self.assertEqual(at.text_input(key="wan_destino_input").value, "1.1.1.1")
+        self.assertTrue(any("não pôde ser salva" in aviso.value for aviso in at.warning))
+
 
 if __name__ == "__main__":
     unittest.main()
