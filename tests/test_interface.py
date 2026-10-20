@@ -229,6 +229,42 @@ class InterfaceTest(unittest.TestCase):
                     self.assertEqual(at.metric[0].value, "—")
                     self.assertEqual(at.metric[4].value, "0")
 
+    def test_exclusao_de_csv_exige_confirmacao_e_atualiza_estado_vazio(self):
+        caminho = self.csv()
+        at = self.app().run()
+        at.button(key="excluir_csv").click().run()
+        self.assertTrue(caminho.exists())
+        self.assertEqual(at.warning[-1].value, "Tem certeza? Isso não pode ser desfeito.")
+        at.button(key="cancelar_exclusao_csv").click().run()
+        self.assertTrue(caminho.exists())
+        at.button(key="excluir_csv").click().run()
+        at.button(key="confirmar_exclusao_csv").click().run()
+        self.assertFalse(at.exception)
+        self.assertFalse(caminho.exists())
+        self.assertEqual(at.toast[-1].value, f"Arquivo `{caminho.name}` excluído.")
+        self.assertEqual(at.toast[-1].duration, 5)
+        self.assertIn("Nenhum arquivo de dados", at.info[-1].value)
+        self.assertTrue(at.button(key="gerar").disabled)
+
+    def test_exclusao_de_csv_fica_desabilitada_durante_coleta(self):
+        self.csv()
+        with patch("coletor.ping_collector.subprocess.run", return_value=SimpleNamespace(stdout="time=10ms")):
+            at = self.app().run()
+            at.text_input(key="wan_destino_input").set_value("8.8.8.8").run()
+            at.button(key="bold1").click().run()
+            self.assertTrue(at.button(key="excluir_csv").disabled)
+
+    def test_falha_ao_excluir_csv_exibe_erro_e_preserva_arquivo(self):
+        caminho = self.csv()
+        at = self.app().run()
+        at.button(key="excluir_csv").click().run()
+        with patch("armazenamento.armazenamento.os.remove", side_effect=PermissionError("sem acesso")):
+            at.button(key="confirmar_exclusao_csv").click().run()
+        self.assertFalse(at.exception)
+        self.assertTrue(caminho.exists())
+        self.assertIn("Não foi possível excluir o arquivo", at.toast[-1].value)
+        self.assertEqual(at.toast[-1].duration, 5)
+
     def test_gerar_visualizar_e_exportar_relatorio(self):
         self.csv()
         at = self.app().run()
@@ -272,6 +308,50 @@ class InterfaceTest(unittest.TestCase):
         at.selectbox[0].set_value(nomes[0]).run()
         self.assertFalse(at.exception)
         self.assertEqual(at.markdown[-1].value, nomes[0])
+
+    def test_exclusao_de_relatorio_remove_selecionado_e_mantem_restante(self):
+        pasta = Path("dados/relatorios")
+        pasta.mkdir(parents=True)
+        nomes = ["relatorio_20261017_120001.md", "relatorio_20261017_120059.md"]
+        for nome in nomes:
+            (pasta / nome).write_text(nome, encoding="utf-8")
+        at = self.app().switch_page("paginas/relatorio.py").run()
+        at.button(key="excluir_relatorio").click().run()
+        self.assertTrue((pasta / nomes[1]).exists())
+        self.assertEqual(at.warning[-1].value, "Tem certeza? Isso não pode ser desfeito.")
+        at.button(key="confirmar_exclusao_relatorio").click().run()
+        self.assertFalse(at.exception)
+        self.assertFalse((pasta / nomes[1]).exists())
+        self.assertTrue((pasta / nomes[0]).exists())
+        self.assertEqual(at.toast[-1].value, f"Relatório `{nomes[1]}` excluído.")
+        self.assertEqual(at.toast[-1].duration, 5)
+        self.assertEqual(at.markdown[-1].value, nomes[0])
+
+    def test_exclusao_do_ultimo_relatorio_atualiza_estado_vazio(self):
+        pasta = Path("dados/relatorios")
+        pasta.mkdir(parents=True)
+        relatorio = pasta / "relatorio_20261017_120001.md"
+        relatorio.write_text("# Relatório", encoding="utf-8")
+        at = self.app().switch_page("paginas/relatorio.py").run()
+        at.button(key="excluir_relatorio").click().run()
+        at.button(key="confirmar_exclusao_relatorio").click().run()
+        self.assertFalse(at.exception)
+        self.assertFalse(relatorio.exists())
+        self.assertTrue(any("Nenhum relatório disponível" in aviso.value for aviso in at.info))
+
+    def test_falha_ao_excluir_relatorio_exibe_erro_e_preserva_arquivo(self):
+        pasta = Path("dados/relatorios")
+        pasta.mkdir(parents=True)
+        relatorio = pasta / "relatorio_20261017_120001.md"
+        relatorio.write_text("# Relatório", encoding="utf-8")
+        at = self.app().switch_page("paginas/relatorio.py").run()
+        at.button(key="excluir_relatorio").click().run()
+        with patch("armazenamento.armazenamento.os.remove", side_effect=PermissionError("sem acesso")):
+            at.button(key="confirmar_exclusao_relatorio").click().run()
+        self.assertFalse(at.exception)
+        self.assertTrue(relatorio.exists())
+        self.assertIn("Não foi possível excluir o relatório", at.toast[-1].value)
+        self.assertEqual(at.toast[-1].duration, 5)
 
     def test_falha_de_leitura_e_escrita_de_relatorio_exibe_mensagem(self):
         pasta = Path("dados/relatorios")

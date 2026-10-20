@@ -16,7 +16,7 @@ import streamlit as st
 
 from coletor.controle import configuracao_padrao
 from coletor.deteccao_rede import detectar_hosts_camadas, detectar_tipo_conexao
-from armazenamento.armazenamento import PASTA_DADOS, listar_arquivos
+from armazenamento.armazenamento import PASTA_DADOS, excluir_arquivo_dados, listar_arquivos
 from paginas.recursos import (
     aplicar_configuracao,
     carregar_dados_monitor,
@@ -30,6 +30,40 @@ from visualizacao.graficos import (
 
 controlador = obter_controlador()
 configuracao = controlador.ler_configuracao()
+
+
+def excluir_csv_confirmado(nome_arquivo: str):
+    try:
+        excluir_arquivo_dados(nome_arquivo, ".csv")
+    except (OSError, ValueError) as erro:
+        st.session_state.erro_exclusao_csv = f"Não foi possível excluir o arquivo: {erro}"
+    else:
+        st.session_state.mensagem_exclusao_csv = f"Arquivo `{nome_arquivo}` excluído."
+
+
+def selecionar_csv_para_exclusao(nome_arquivo: str):
+    st.session_state.csv_para_exclusao = nome_arquivo
+
+
+@st.dialog("Excluir arquivo", icon=":material/delete:")
+def confirmar_exclusao_csv(nome_arquivo: str):
+    if "mensagem_exclusao_csv" in st.session_state:
+        st.rerun()
+    st.write(f"Arquivo selecionado: `{nome_arquivo}`")
+    st.warning("Tem certeza? Isso não pode ser desfeito.")
+    if "erro_exclusao_csv" in st.session_state:
+        st.toast(
+            st.session_state.pop("erro_exclusao_csv"),
+            icon=":material/error:",
+            duration=5,
+        )
+    col_cancelar, col_confirmar = st.columns(2)
+    if col_cancelar.button("Cancelar", key="cancelar_exclusao_csv", width="stretch"):
+        st.rerun()
+    col_confirmar.button(
+        "Sim", key="confirmar_exclusao_csv", type="primary", width="stretch",
+        on_click=excluir_csv_confirmado, args=(nome_arquivo,),
+    )
 
 # --- Barra lateral: configuração e controle da coleta ---
 st.sidebar.header("Configuração da coleta")
@@ -117,6 +151,19 @@ if st.session_state.coleta_ativa:
 # --- Área principal: visualização dos dados já coletados ---
 st.header("Monitor de Rede")
 
+if "mensagem_exclusao_csv" in st.session_state:
+    st.toast(
+        st.session_state.pop("mensagem_exclusao_csv"),
+        icon=":material/check_circle:",
+        duration=5,
+    )
+if "erro_exclusao_csv" in st.session_state:
+    st.toast(
+        st.session_state.pop("erro_exclusao_csv"),
+        icon=":material/error:",
+        duration=5,
+    )
+
 arquivos_disponiveis = listar_arquivos(PASTA_DADOS, ".csv")
 
 if not arquivos_disponiveis:
@@ -124,7 +171,18 @@ if not arquivos_disponiveis:
 else:
     col_arquivo, col_janela = st.columns(2)
 
-    arquivo_selecionado = col_arquivo.selectbox("Arquivo para visualizar", arquivos_disponiveis)
+    col_selecao, col_excluir = col_arquivo.columns([8, 1], vertical_alignment="bottom")
+    arquivo_selecionado = col_selecao.selectbox("Arquivo para visualizar", arquivos_disponiveis)
+    if col_excluir.button(
+        "🗑️",
+        key="excluir_csv",
+        help="Excluir arquivo selecionado",
+        disabled=st.session_state.coleta_ativa,
+        width="stretch",
+        on_click=selecionar_csv_para_exclusao,
+        args=(arquivo_selecionado,),
+    ):
+        confirmar_exclusao_csv(st.session_state.csv_para_exclusao)
 
     # Seletor de janela temporal dos gráficos (independente da barra lateral);
     # as estatísticas continuam sendo calculadas sobre o arquivo completo.
