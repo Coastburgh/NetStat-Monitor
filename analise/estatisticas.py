@@ -93,6 +93,20 @@ def calcular_estatisticas_descritivas(df: pd.DataFrame) -> dict:
     }
 
 
+def calcular_limites_iqr(df: pd.DataFrame, multiplicador: float = 1.5, coluna: str = "latencia_ms") -> dict:
+    """Centraliza os limites para que gráficos e relatório usem a mesma regra."""
+    valores = df[coluna].dropna() if df is not None and coluna in df else pd.Series(dtype="float64")
+    if valores.empty:
+        return dict.fromkeys(("q1", "q3", "iqr", "limite_inferior", "limite_superior"))
+    q1, q3 = valores.quantile([0.25, 0.75])
+    iqr = q3 - q1
+    return {
+        "q1": float(q1), "q3": float(q3), "iqr": float(iqr),
+        "limite_inferior": float(q1 - multiplicador * iqr),
+        "limite_superior": float(q3 + multiplicador * iqr),
+    }
+
+
 def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5, coluna: str = "latencia_ms") -> pd.DataFrame:
     """
     Identifica outliers de latência pelo método do intervalo interquartil (IQR).
@@ -112,12 +126,11 @@ def detectar_outliers_iqr(df: pd.DataFrame, multiplicador: float = 1.5, coluna: 
         df = pd.DataFrame(columns=[coluna])
     df_validos = df.dropna(subset=[coluna])
 
-    q1 = df_validos[coluna].quantile(0.25)
-    q3 = df_validos[coluna].quantile(0.75)
-    iqr = q3 - q1
-
-    limite_inferior = q1 - multiplicador * iqr
-    limite_superior = q3 + multiplicador * iqr
+    limites = calcular_limites_iqr(df_validos, multiplicador, coluna)
+    limite_inferior = limites["limite_inferior"]
+    limite_superior = limites["limite_superior"]
+    if limite_inferior is None:
+        return df_validos.assign(limite_inferior=float("nan"), limite_superior=float("nan"))
 
     outliers = df_validos[
         (df_validos[coluna] < limite_inferior)
@@ -134,9 +147,9 @@ def calcular_correlacao_horario_latencia(df: pd.DataFrame) -> dict:
     extraída do timestamp) e a latência observada.
 
     Retorna o coeficiente de correlação (r), que varia de -1 a 1, e o
-    p-valor associado, que indica se essa correlação é estatisticamente
-    significativa (convencionalmente, p < 0.05) ou se pode ter ocorrido
-    ao acaso, dado o tamanho da amostra.
+    p-valor nominal associado, calculado sob a hipótese nula do teste.
+    A dependência temporal entre pings limita a interpretação inferencial;
+    significância estatística não mede a importância prática da associação.
 
     Observação sobre a limitação desse método: a hora do dia é tratada aqui
     como uma variável numérica linear (0, 1, 2, ..., 23), o que ignora sua
@@ -165,7 +178,7 @@ def calcular_correlacao_horario_latencia(df: pd.DataFrame) -> dict:
 
     return {
         "coeficiente_r": float(round(coeficiente_r, 4)),
-        "p_valor": float(round(p_valor, 4)),
+        "p_valor": float(p_valor),
         "quantidade_amostras": int(len(df_validos)),
         "significativo": bool(p_valor < 0.05),
     }
@@ -178,6 +191,54 @@ def calcular_perda_pacotes_total(df: pd.DataFrame) -> float:
     return float(round(df["latencia_ms"].isna().sum() / len(df) * 100, 2))
 
 
+def analisar_perfil_horario(df: pd.DataFrame) -> list[dict]:
+    """Expõe horários ruins e sua cobertura, sem supor uma tendência linear.
+
+    Um dia-hora é comparável quando contém tentativas em pelo menos 30 minutos
+    distintos. É um critério operacional de cobertura, não um teste estatístico.
+    Horas sem coleta são omitidas; falhas permanecem no denominador da perda.
+    """
+    if df is None or df.empty or not {"timestamp", "latencia_ms"}.issubset(df.columns):
+        return []
+    dados = df.dropna(subset=["timestamp"]).copy()
+    dados["hora"] = dados["timestamp"].dt.hour
+    dados["dia"] = dados["timestamp"].dt.date
+    dados["minuto"] = dados["timestamp"].dt.minute
+    dados["minuto_com_resposta"] = dados["minuto"].where(dados["latencia_ms"].notna())
+    diarios = dados.groupby(["dia", "hora"]).agg(
+        minutos=("minuto_com_resposta", "nunique"), mediana=("latencia_ms", "median"),
+    ).reset_index()
+    diarios = diarios[(diarios["minutos"] >= 30) & diarios["mediana"].notna()].copy()
+    por_dia = diarios.groupby("dia")["mediana"]
+    diarios["comparavel"] = por_dia.transform("count") >= 2
+    diarios["pior"] = (
+        diarios["comparavel"]
+        & (diarios["mediana"] == por_dia.transform("max"))
+        & (por_dia.transform("max") > por_dia.transform("min"))
+    )
+    perfil = []
+    for hora, grupo in dados.groupby("hora", sort=True):
+        cobertura = grupo.groupby("dia")["minuto"].nunique()
+        cobertura_respostas = grupo.groupby("dia")["minuto_com_resposta"].nunique()
+        cobertos = grupo[grupo["dia"].isin(cobertura[cobertura >= 30].index)]
+        respostas_cobertas = grupo[grupo["dia"].isin(cobertura_respostas[cobertura_respostas >= 30].index)]["latencia_ms"].dropna()
+        validos = grupo["latencia_ms"].dropna()
+        comparacoes = diarios[diarios["hora"] == hora]
+        perfil.append({
+            "hora": int(hora), "tentativas": len(grupo), "validas": len(validos),
+            "dias": int(grupo["dia"].nunique()),
+            "dias_com_cobertura": int((cobertura >= 30).sum()),
+            "dias_comparaveis": int(comparacoes["comparavel"].sum()),
+            "dias_pior_latencia": int(comparacoes["pior"].sum()),
+            "mediana_coberta_ms": float(respostas_cobertas.median()) if not respostas_cobertas.empty else None,
+            "perda_coberta_pct": calcular_perda_pacotes_total(cobertos) if not cobertos.empty else None,
+            "mediana_ms": float(validos.median()) if not validos.empty else None,
+            "p90_ms": float(validos.quantile(0.90)) if not validos.empty else None,
+            "perda_pct": calcular_perda_pacotes_total(grupo),
+        })
+    return perfil
+
+
 def resumir_medicoes(df: pd.DataFrame, detalhado: bool = False) -> dict:
     """Compartilha o resumo sem calcular IQR e correlação quando o painel não os usa."""
     resultado = {
@@ -186,8 +247,28 @@ def resumir_medicoes(df: pd.DataFrame, detalhado: bool = False) -> dict:
         "perda_total": calcular_perda_pacotes_total(df),
     }
     if detalhado:
-        resultado["quantidade_outliers"] = len(detectar_outliers_iqr(df))
+        outliers = detectar_outliers_iqr(df)
+        resultado["quantidade_outliers"] = len(outliers)
         resultado["correlacao"] = calcular_correlacao_horario_latencia(df)
+        resultado["iqr"] = calcular_limites_iqr(df)
+        mediana = float(df["latencia_ms"].dropna().median()) if resultado["estatisticas"]["quantidade_amostras"] else None
+        # Todo outlier superior está acima de Q3; a mediana separa as duas caudas.
+        resultado["picos_superiores"] = int((outliers["latencia_ms"] > mediana).sum()) if mediana is not None else 0
+        resultado["outliers_inferiores"] = len(outliers) - resultado["picos_superiores"]
+        dados = df if df is not None else medicoes_vazias()
+        tempos = dados["timestamp"].dropna().sort_values() if "timestamp" in dados else pd.Series(dtype="datetime64[ns]")
+        intervalos = tempos.diff().dt.total_seconds().dropna()
+        intervalos = intervalos[intervalos > 0]
+        resultado["periodo"] = {
+            "inicio": tempos.min() if not tempos.empty else None,
+            "fim": tempos.max() if not tempos.empty else None,
+            "dias": int(tempos.dt.date.nunique()),
+            "horas": int(tempos.dt.hour.nunique()),
+            "intervalo_mediano_s": float(intervalos.median()) if not intervalos.empty else None,
+        }
+        resultado["perfil_horario"] = analisar_perfil_horario(dados)
+        jitter = dados[["jitter_ms"]].rename(columns={"jitter_ms": "latencia_ms"}) if "jitter_ms" in dados else None
+        resultado["jitter"] = calcular_estatisticas_descritivas(jitter)
     return resultado
 
 
