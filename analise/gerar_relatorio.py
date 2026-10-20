@@ -13,14 +13,17 @@ pacotes), sem duplicar nenhuma lógica de cálculo.
 import os
 import re
 from datetime import datetime
+from functools import partial
 from html import escape
 from io import BytesIO
+from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, portrait
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.lib.utils import ImageReader
 
 from analise.estatisticas import (
     carregar_medicoes,
@@ -37,30 +40,81 @@ from armazenamento.armazenamento import (
 def _formatar_texto_pdf(texto: str) -> str:
     """Converte a marcação inline usada nos relatórios para o formato do ReportLab."""
     texto = escape(texto)
-    texto = re.sub(r"`([^`]+)`", r'<font name="Courier">\1</font>', texto)
-    return re.sub(r"_([^_]+)_", r"<i>\1</i>", texto)
+    def converter(correspondencia):
+        codigo, negrito, italico, rotulo, endereco = correspondencia.groups()
+        if codigo is not None:
+            return f'<font name="Courier">{codigo}</font>'
+        if negrito is not None:
+            return f"<b>{negrito}</b>"
+        if italico is not None:
+            return f"<i>{italico}</i>"
+        return f'<link href="{endereco}" color="#007D91">{rotulo}</link>'
+
+    return re.sub(r"`([^`]+)`|\*\*([^*]+)\*\*|(?<!\w)_([^_]+)_(?!\w)|\[([^\]]+)\]\((https://[^\s)]+)\)", converter, texto)
+
+
+def _decorar_pagina_pdf(canvas, documento, data_geracao: str | None = None):
+    """Mantém a marca e a navegação em todas as páginas, sem depender do cwd."""
+    largura, altura = A4
+    canvas.saveState()
+    canvas.setFillColor(colors.HexColor("#121922"))
+    canvas.rect(0, altura - 25 * mm, largura, 25 * mm, fill=1, stroke=0)
+    logo = Path(__file__).resolve().parents[1] / "assets" / "NS_logo_long.png"
+    if logo.is_file():
+        canvas.drawImage(ImageReader(str(logo)), 15 * mm, altura - 17 * mm,
+                         width=65 * mm, height=11 * mm, preserveAspectRatio=True, mask="auto")
+    else:
+        canvas.setFillColor(colors.white)
+        canvas.drawString(15 * mm, altura - 15 * mm, "NETSTAT MONITOR")
+    canvas.setFillColor(colors.white)
+    canvas.setFont("Helvetica-Bold", 16)
+    canvas.drawRightString(largura - 15 * mm, altura - 13 * mm, "Relatório Consolidado")
+    if data_geracao is not None:
+        canvas.setFont("Helvetica", 7)
+        canvas.drawRightString(largura - 15 * mm, altura - 17 * mm, f"Gerado automaticamente em {data_geracao}")
+    canvas.setFillColor(colors.HexColor("#00ABC2"))
+    canvas.rect(0, altura - 26 * mm, largura, 1 * mm, fill=1, stroke=0)
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#526171"))
+    canvas.drawString(15 * mm, 10 * mm, "NetStat Monitor | Análise de conectividade ICMP")
+    canvas.drawRightString(largura - 15 * mm, 10 * mm, f"Página {documento.page}")
+    canvas.restoreState()
 
 
 def exportar_relatorio_pdf(conteudo: str | None) -> bytes:
     """Gera em memória um PDF legível a partir do Markdown do relatório."""
     conteudo = conteudo or ""
+    geracao = re.search(r"^Gerado automaticamente em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", conteudo, re.MULTILINE)
+    decorar_pagina = partial(_decorar_pagina_pdf, data_geracao=geracao.group(1) if geracao else None)
     buffer = BytesIO()
     documento = SimpleDocTemplate(
         buffer,
         pagesize=portrait(A4),
         rightMargin=15 * mm,
         leftMargin=15 * mm,
-        topMargin=15 * mm,
-        bottomMargin=15 * mm,
+        topMargin=33 * mm,
+        bottomMargin=19 * mm,
         title="Relatório consolidado — NetStat Monitor",
     )
     estilos = getSampleStyleSheet()
+    for nome in ("Title", "Heading2", "Heading3"):
+        estilos[nome].textColor = colors.HexColor("#007D91")
+    estilos["Title"].alignment = 0
+    estilos["BodyText"].fontSize = 9
+    estilos["BodyText"].leading = 13
+    estilos.add(ParagraphStyle("Celula", parent=estilos["BodyText"], fontSize=8, leading=11))
+    estilos.add(ParagraphStyle("Nota", parent=estilos["BodyText"], backColor=colors.HexColor("#EAF8FA"),
+                               borderPadding=7, spaceBefore=6, spaceAfter=9))
     elementos = []
     linhas = conteudo.splitlines()
     indice = 0
+    analise_detalhada = False
 
     while indice < len(linhas):
         linha = linhas[indice].strip()
+        if linha == "# Relatório consolidado — NetStat Monitor" or (geracao and linha.startswith(geracao.group(0))):
+            indice += 1
+            continue
 
         if linha.startswith("|"):
             tabela = []
@@ -71,7 +125,7 @@ def exportar_relatorio_pdf(conteudo: str | None) -> bytes:
                 ]
                 if not all(re.fullmatch(r":?-+:?", celula) for celula in celulas):
                     tabela.append([
-                        Paragraph(_formatar_texto_pdf(celula), estilos["BodyText"])
+                        Paragraph(_formatar_texto_pdf(celula), estilos["Celula"])
                         for celula in celulas
                     ])
                 indice += 1
@@ -84,27 +138,42 @@ def exportar_relatorio_pdf(conteudo: str | None) -> bytes:
                 )
                 elemento_tabela.setStyle(
                     TableStyle([
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF5")),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#D3F1F5")),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F5F8")]),
+                        ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor("#00ABC2")),
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
                         ("LEFTPADDING", (0, 0), (-1, -1), 4),
                         ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                        ("TOPPADDING", (0, 0), (-1, -1), 6),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
                     ])
                 )
-                elementos.extend([elemento_tabela, Spacer(1, 4 * mm)])
+                if len(tabela[0]) == 2 and len(tabela) <= 15:
+                    elementos.append(KeepTogether([elemento_tabela, Spacer(1, 4 * mm)]))
+                else:
+                    elementos.extend([elemento_tabela, Spacer(1, 4 * mm)])
             continue
 
         if linha.startswith("# "):
             elementos.append(Paragraph(_formatar_texto_pdf(linha[2:]), estilos["Title"]))
         elif linha.startswith("## "):
+            analise_detalhada = linha.startswith("## 3. ")
             elementos.append(Paragraph(_formatar_texto_pdf(linha[3:]), estilos["Heading2"]))
+        elif linha.startswith("### "):
+            if analise_detalhada:
+                elementos.append(CondPageBreak(100 * mm))
+            elementos.append(Paragraph(_formatar_texto_pdf(linha[4:]), estilos["Heading3"]))
+        elif linha.startswith("#### "):
+            elementos.append(Paragraph(_formatar_texto_pdf(linha[5:]), estilos["Heading4"]))
+        elif linha.startswith("> "):
+            elementos.append(Paragraph(_formatar_texto_pdf(linha[2:]), estilos["Nota"]))
         elif linha:
             elementos.append(Paragraph(_formatar_texto_pdf(linha), estilos["BodyText"]))
-        else:
+        elif elementos:
             elementos.append(Spacer(1, 2 * mm))
         indice += 1
 
-    documento.build(elementos)
+    documento.build(elementos, onFirstPage=decorar_pagina, onLaterPages=decorar_pagina)
     return buffer.getvalue()
 
 

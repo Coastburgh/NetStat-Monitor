@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pandas as pd
+from reportlab.platypus import Paragraph, Spacer
 
 from analise.estatisticas import (
     analisar_perfil_horario,
@@ -15,6 +16,8 @@ from analise.estatisticas import (
     resumir_medicoes,
 )
 from analise.gerar_relatorio import (
+    _decorar_pagina_pdf,
+    _formatar_texto_pdf,
     exportar_relatorio_pdf,
     gerar_relatorio_consolidado,
     salvar_relatorio,
@@ -251,6 +254,58 @@ class DadosTest(unittest.TestCase):
         self.assertIn("## 1. Resumo", relatorio)
         self.assertIn("## Arquivos não analisados", relatorio)
         self.assertIn("não representam toda a pasta", relatorio)
+
+    def test_relatorio_sem_arquivos_e_pdf_com_marcacao_e_logo_ausente(self):
+        self.assertIn("Nenhum arquivo", gerar_relatorio_consolidado(self.pasta))
+        texto = "# Relatório\n\n## Resumo\n\n### Destino\n\n#### Detalhes\n\n> **Atenção:** sem dados.\n"
+        for logo_presente in (True, False):
+            with self.subTest(logo_presente=logo_presente), patch("analise.gerar_relatorio.Path.is_file", return_value=logo_presente):
+                self.assertTrue(exportar_relatorio_pdf(texto).startswith(b"%PDF-"))
+
+    def test_pdf_preserva_nome_da_fonte_e_formata_texto_sem_html_arbitrario(self):
+        texto = _formatar_texto_pdf("`lan_host_wifi.csv` **Resumo** _nota_ <script>")
+        self.assertIn('<font name="Courier">lan_host_wifi.csv</font>', texto)
+        self.assertIn("<b>Resumo</b>", texto)
+        self.assertIn("<i>nota</i>", texto)
+        self.assertIn("&lt;script&gt;", texto)
+        self.assertNotIn("<script>", texto)
+
+    def test_pdf_move_titulo_e_data_original_para_cabecalho(self):
+        for sufixo in (".", " a partir de 2 arquivo(s) de medições."):
+            conteudo = (
+                "# Relatório consolidado — NetStat Monitor\n\n"
+                f"Gerado automaticamente em 17/10/2026 12:34{sufixo}\n\n"
+                "## 1. Resumo da conexão\n\nDados da coleta.\n"
+            )
+            with self.subTest(sufixo=sufixo), patch(
+                "analise.gerar_relatorio._decorar_pagina_pdf", wraps=_decorar_pagina_pdf
+            ) as decorar, patch("analise.gerar_relatorio.Paragraph", wraps=Paragraph) as paragrafo:
+                self.assertTrue(exportar_relatorio_pdf(conteudo).startswith(b"%PDF-"))
+                self.assertEqual(decorar.call_args.kwargs["data_geracao"], "17/10/2026 12:34")
+                textos = [chamada.args[0] for chamada in paragrafo.call_args_list]
+                self.assertIn("Dados da coleta.", textos)
+                self.assertFalse(any("Gerado automaticamente" in texto or "NetStat Monitor" in texto for texto in textos))
+        self.gravar("2026-10-01T10:00:00,8.8.8.8,10,,0\n")
+        self.assertNotIn("a partir de", gerar_relatorio_consolidado(self.pasta))
+
+    def test_pdf_remove_apenas_linhas_vazias_anteriores_ao_primeiro_conteudo(self):
+        cabecalho = "# Relatório consolidado — NetStat Monitor\n\nGerado automaticamente em 17/10/2026 12:34.\n\n"
+        for quebra in ("\n", "\r\n"):
+            for prefixo in ("\n \n", cabecalho):
+                conteudo = (prefixo + "## Resumo\n\nDados da coleta.").replace("\n", quebra)
+                with self.subTest(quebra=repr(quebra), prefixo=prefixo), patch(
+                    "analise.gerar_relatorio.SimpleDocTemplate.build"
+                ) as construir:
+                    exportar_relatorio_pdf(conteudo)
+                    elementos = construir.call_args.args[0]
+                    self.assertEqual(len(elementos), 3)
+                    self.assertIsInstance(elementos[0], Paragraph)
+                    self.assertIsInstance(elementos[1], Spacer)
+                    self.assertIsInstance(elementos[2], Paragraph)
+        for conteudo in (None, "", "\n \n"):
+            with self.subTest(conteudo=conteudo), patch("analise.gerar_relatorio.SimpleDocTemplate.build") as construir:
+                exportar_relatorio_pdf(conteudo)
+                self.assertEqual(construir.call_args.args[0], [])
 
     def test_cache_invalida_com_medicoes_e_substituicao_mesmo_tamanho(self):
         _carregar_dados_monitor.clear()
