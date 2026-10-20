@@ -22,6 +22,7 @@ from armazenamento.armazenamento import (
     ArmazenamentoCSV,
     CAMPOS,
     caminho_coleta,
+    excluir_arquivo_dados,
     extrair_metadados_nome_arquivo,
     listar_arquivos,
     validar_host,
@@ -178,6 +179,46 @@ class DadosTest(unittest.TestCase):
         self.assertEqual(listar_arquivos(self.pasta / "ausente", ".csv"), [])
         with patch("armazenamento.armazenamento.os.scandir", side_effect=PermissionError):
             self.assertEqual(listar_arquivos(self.pasta, ".csv"), [])
+
+    def test_exclusao_remove_apenas_csv_e_relatorio_das_pastas_previstas(self):
+        pasta_relatorios = self.pasta / "relatorios"
+        pasta_relatorios.mkdir()
+        self.csv.touch()
+        relatorio = pasta_relatorios / "relatorio_20261019_120000.md"
+        relatorio.touch()
+        with patch("armazenamento.armazenamento.PASTA_DADOS", str(self.pasta)), patch(
+            "armazenamento.armazenamento.PASTA_RELATORIOS", str(pasta_relatorios)
+        ):
+            excluir_arquivo_dados(self.csv.name, ".csv")
+            excluir_arquivo_dados(relatorio.name, ".md")
+        self.assertFalse(self.csv.exists())
+        self.assertFalse(relatorio.exists())
+
+    def test_exclusao_rejeita_nome_extensao_e_caminho_invalidos(self):
+        pasta_relatorios = self.pasta / "relatorios"
+        pasta_relatorios.mkdir()
+        (self.pasta / "diretorio.csv").mkdir()
+        with patch("armazenamento.armazenamento.PASTA_DADOS", str(self.pasta)), patch(
+            "armazenamento.armazenamento.PASTA_RELATORIOS", str(pasta_relatorios)
+        ):
+            for nome, extensao in [
+                (None, ".csv"), ("", ".csv"), ("../arquivo.csv", ".csv"),
+                ("subpasta/arquivo.csv", ".csv"), (r"subpasta\arquivo.csv", ".csv"),
+                ("arquivo.txt", ".csv"), ("arquivo.csv", ".txt"),
+                ("diretorio.csv", ".csv"),
+            ]:
+                with self.subTest(nome=nome, extensao=extensao), self.assertRaises(ValueError):
+                    excluir_arquivo_dados(nome, extensao)
+            with self.assertRaises(FileNotFoundError):
+                excluir_arquivo_dados("ausente.csv", ".csv")
+
+    def test_falha_de_exclusao_preserva_arquivo(self):
+        self.csv.touch()
+        with patch("armazenamento.armazenamento.PASTA_DADOS", str(self.pasta)), patch(
+            "armazenamento.armazenamento.os.remove", side_effect=PermissionError("sem acesso")
+        ), self.assertRaises(PermissionError):
+            excluir_arquivo_dados(self.csv.name, ".csv")
+        self.assertTrue(self.csv.exists())
 
     def test_simulador_usa_o_mesmo_esquema(self):
         medicoes = gerar_medicoes_simuladas("8.8.8.8", 4, 10, 0, probabilidade_falha=1)

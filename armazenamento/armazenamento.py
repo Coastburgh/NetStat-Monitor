@@ -34,6 +34,29 @@ def listar_arquivos(pasta: str, extensao: str, decrescente: bool = False) -> lis
         return []
 
 
+def excluir_arquivo_dados(nome_arquivo: str, extensao: str) -> None:
+    """Exclui somente CSVs de dados ou relatórios Markdown das pastas previstas."""
+    pastas_permitidas = {".csv": PASTA_DADOS, ".md": PASTA_RELATORIOS}
+    pasta = pastas_permitidas.get(extensao)
+    if (
+        pasta is None
+        or not isinstance(nome_arquivo, str)
+        or not nome_arquivo.endswith(extensao)
+        or nome_arquivo in ("", ".", "..")
+        or "/" in nome_arquivo
+        or "\\" in nome_arquivo
+        or os.path.isabs(nome_arquivo)
+    ):
+        raise ValueError("Arquivo inválido para exclusão.")
+
+    caminho = os.path.join(pasta, nome_arquivo)
+    if not os.path.isfile(caminho):
+        if not os.path.exists(caminho):
+            raise FileNotFoundError(caminho)
+        raise ValueError("O caminho informado não é um arquivo.")
+    os.remove(caminho)
+
+
 def normalizar_tipo_conexao(tipo: str) -> str:
     sessao = (tipo or "").lower().replace("-", "")
     if sessao not in ROTULOS_SESSAO:
