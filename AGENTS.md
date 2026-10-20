@@ -46,7 +46,7 @@
 
 - Before editing, check the current branch with `git branch --show-current`.
   - If the request continues the topic of the current branch, stay on it.
-  - Otherwise, create a new branch from the main branch with one of these prefixes:
+  - Otherwise, create a new branch with one of these prefixes:
     - `fix/<short-description>` for bug fixes
     - `feat/<short-description>` for new features
     - `refactor/<short-description>` for refactoring
