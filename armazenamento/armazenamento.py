@@ -9,6 +9,8 @@ import os
 import ipaddress
 import re
 import sys
+import json
+import tempfile
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import quote, unquote
@@ -57,6 +59,41 @@ PADRAO_NOME_ARQUIVO = re.compile(
 )
 ROTULOS_CAMADA = {"lan": "LAN (Gateway)", "man": "MAN (Provedor)", "wan": "WAN (Destino)"}
 ROTULOS_SESSAO = {"wifi": "Wi-Fi", "ethernet": "Ethernet"}
+
+
+def carregar_configuracao(caminho: str) -> dict:
+    """Lê preferências sem exigir que o arquivo exista na primeira execução."""
+    try:
+        with open(caminho, encoding="utf-8") as arquivo:
+            configuracao = json.load(arquivo)
+    except FileNotFoundError:
+        return {}
+    if not isinstance(configuracao, dict):
+        raise ValueError("O arquivo de configuração deve conter um objeto JSON.")
+    return configuracao
+
+
+def salvar_configuracao(configuracao: dict, caminho: str) -> None:
+    """Substitui o arquivo somente após concluir a escrita no mesmo diretório.
+
+    Fechar o temporário antes de os.replace também permite a troca no Windows.
+    Uma falha de escrita preserva a última configuração salva.
+    """
+    pasta = os.path.dirname(os.path.abspath(caminho))
+    os.makedirs(pasta, exist_ok=True)
+    temporario = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=pasta, delete=False) as arquivo:
+            temporario = arquivo.name
+            json.dump(configuracao, arquivo, ensure_ascii=False, indent=2, allow_nan=False)
+            arquivo.write("\n")
+        os.replace(temporario, caminho)
+    finally:
+        if temporario is not None:
+            try:
+                os.remove(temporario)
+            except OSError:
+                pass
 
 
 def listar_arquivos(pasta: str, extensao: str, decrescente: bool = False) -> list[str]:

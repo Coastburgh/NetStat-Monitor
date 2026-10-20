@@ -46,6 +46,23 @@ class PontosEntradaTest(unittest.TestCase):
             self.assertTrue(destino.is_file())
             self.assertFalse((outra / "dados").exists())
 
+    def test_configuracao_persiste_entre_processos_independentes(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            salvar = self.executar(
+                pasta, "-c", "from paginas.recursos import obter_controlador; "
+                "obter_controlador().atualizar_configuracao({'wan': '1.1.1.1', 'intervalo': 12.0})",
+            )
+            self.assertEqual(salvar.returncode, 0, salvar.stderr)
+            self.assertTrue((Path(pasta) / "dados" / "configuracao.json").is_file())
+            restaurar = self.executar(
+                pasta, "-c", "from paginas.recursos import obter_controlador; "
+                "controle = obter_controlador(); "
+                "assert controle.ler_configuracao()['wan'] == '1.1.1.1'; "
+                "assert controle.ler_configuracao()['intervalo'] == 12.0; "
+                "assert controle.camadas_ativas() == []",
+            )
+            self.assertEqual(restaurar.returncode, 0, restaurar.stderr)
+
     def test_modulos_sem_dados_exibem_mensagem_sem_traceback(self):
         with tempfile.TemporaryDirectory() as pasta:
             for modulo in ["analise.estatisticas", "visualizacao.graficos"]:

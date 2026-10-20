@@ -6,6 +6,7 @@ import streamlit as st
 
 from analise.estatisticas import carregar_medicoes, resumir_medicoes
 from coletor.controle import ControladorColeta
+from armazenamento import armazenamento
 
 
 CAMPOS_CONFIGURACAO = {
@@ -23,11 +24,14 @@ CAMPOS_CONFIGURACAO = {
 # sessão as reencontre, mostre o estado correto e consiga pará-las.
 @st.cache_resource
 def obter_controlador() -> ControladorColeta:
-    return ControladorColeta()
+    caminho = os.path.join(armazenamento.PASTA_DADOS, "configuracao.json")
+    return ControladorColeta(caminho_configuracao=caminho)
 
 
 def inicializar_estado():
     controlador = obter_controlador()
+    if controlador.aviso_configuracao:
+        st.sidebar.warning(controlador.aviso_configuracao)
     configuracao = controlador.ler_configuracao()
     for campo, chave in CAMPOS_CONFIGURACAO.items():
         # Reenvia os valores ao navegador quando os widgets são remontados.

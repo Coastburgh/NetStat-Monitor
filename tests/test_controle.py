@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import subprocess
 import tempfile
 import threading
@@ -142,6 +143,104 @@ class ControleTest(unittest.TestCase):
 
             PingCollector("8.8.8.8").iniciar_coleta_continua(falhar)
         self.assertIn("falha ao armazenar", saida.getvalue())
+
+
+class ConfiguracaoPersistenteTest(unittest.TestCase):
+    def setUp(self):
+        self.temporario = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporario.cleanup)
+        self.caminho = Path(self.temporario.name) / "dados" / "configuracao.json"
+
+    def controle(self):
+        return ControladorColeta(str(self.caminho))
+
+    def gravar(self, conteudo):
+        self.caminho.parent.mkdir(exist_ok=True)
+        self.caminho.write_text(conteudo, encoding="utf-8")
+
+    def test_primeira_execucao_nao_cria_arquivo_e_usa_padrao(self):
+        controle = self.controle()
+        self.assertEqual(controle.ler_configuracao(), configuracao_padrao())
+        self.assertIsNone(controle.aviso_configuracao)
+        self.assertFalse(self.caminho.exists())
+
+    def test_reinicio_restaura_configuracao_e_limpeza_e_persistida(self):
+        valores = {
+            "lan": "192.168.1.1", "man": "2001:4860:4860::8888", "wan": "example.org",
+            "tipo_conexao": "Ethernet", "intervalo": 12.0, "automatica": True,
+        }
+        self.controle().atualizar_configuracao(valores)
+        novo = self.controle()
+        self.assertEqual(novo.ler_configuracao(), valores)
+        self.assertEqual(novo.camadas_ativas(), [])
+        self.assertIsNone(novo.aviso_configuracao)
+        novo.atualizar_configuracao(configuracao_padrao())
+        self.assertEqual(self.controle().ler_configuracao(), configuracao_padrao())
+
+    def test_arquivos_invalidos_nao_impedem_inicializacao_nem_sao_sobrescritos(self):
+        for conteudo in ("", "{", "null", "[]", '"texto"'):
+            with self.subTest(conteudo=conteudo):
+                self.gravar(conteudo)
+                controle = self.controle()
+                self.assertEqual(controle.ler_configuracao(), configuracao_padrao())
+                self.assertIsNotNone(controle.aviso_configuracao)
+                self.assertEqual(self.caminho.read_text(encoding="utf-8"), conteudo)
+        self.caminho.write_bytes(b"\xff")
+        self.assertIsNotNone(self.controle().aviso_configuracao)
+
+    def test_campos_invalidos_usam_padrao_sem_perder_campos_validos(self):
+        for intervalo in (None, "9", True, 0, 4.0, float("nan"), float("inf"), 10 ** 400):
+            with self.subTest(intervalo=intervalo):
+                self.gravar(json.dumps({
+                    "lan": None, "man": "-opcao", "wan": "8.8.8.8", "intervalo": intervalo,
+                    "tipo_conexao": [], "automatica": "sim", "campo_desconhecido": True,
+                }))
+                esperado = {**configuracao_padrao(), "wan": "8.8.8.8"}
+                self.assertEqual(self.controle().ler_configuracao(), esperado)
+                self.assertIsNotNone(self.controle().aviso_configuracao)
+
+    def test_configuracao_parcial_completa_campos_ausentes(self):
+        self.gravar('{"wan": "8.8.8.8"}')
+        controle = self.controle()
+        self.assertEqual(controle.ler_configuracao(), {**configuracao_padrao(), "wan": "8.8.8.8"})
+        self.assertIsNone(controle.aviso_configuracao)
+
+    def test_falha_de_leitura_e_exibida_sem_impedir_uso(self):
+        with patch("coletor.controle.carregar_configuracao", side_effect=PermissionError("sem acesso")):
+            controle = self.controle()
+        self.assertEqual(controle.ler_configuracao(), configuracao_padrao())
+        self.assertIn("sem acesso", controle.aviso_configuracao)
+
+    def test_falha_de_substituicao_preserva_arquivo_e_configuracao_em_memoria(self):
+        controle = self.controle()
+        controle.atualizar_configuracao({"wan": "8.8.8.8"})
+        anterior = self.caminho.read_bytes()
+        with patch("armazenamento.armazenamento.os.replace", side_effect=PermissionError("sem acesso")):
+            controle.atualizar_configuracao({"wan": "1.1.1.1"})
+        self.assertEqual(self.caminho.read_bytes(), anterior)
+        self.assertEqual(controle.ler_configuracao()["wan"], "1.1.1.1")
+        self.assertIn("não pôde ser salva", controle.aviso_configuracao)
+        self.assertEqual(list(self.caminho.parent.iterdir()), [self.caminho])
+        controle.atualizar_configuracao({"intervalo": 9.0})
+        self.assertIsNone(controle.aviso_configuracao)
+        self.assertEqual(self.controle().ler_configuracao()["wan"], "1.1.1.1")
+
+    def test_coleta_ativa_nao_altera_nem_grava_configuracao(self):
+        controle = self.controle()
+        with patch.object(controle, "camadas_ativas", return_value=["wan"]), patch("coletor.controle.salvar_configuracao") as salvar:
+            controle.atualizar_configuracao({"wan": "8.8.8.8"})
+        salvar.assert_not_called()
+        self.assertEqual(controle.ler_configuracao(), configuracao_padrao())
+
+    def test_falha_durante_escrita_preserva_arquivo_anterior(self):
+        controle = self.controle()
+        controle.atualizar_configuracao({"wan": "8.8.8.8"})
+        anterior = self.caminho.read_bytes()
+        with patch("armazenamento.armazenamento.json.dump", side_effect=OSError("disco cheio")):
+            controle.atualizar_configuracao({"wan": "1.1.1.1"})
+        self.assertEqual(self.caminho.read_bytes(), anterior)
+        self.assertEqual(list(self.caminho.parent.iterdir()), [self.caminho])
+        self.assertIn("disco cheio", controle.aviso_configuracao)
 
 
 if __name__ == "__main__":
