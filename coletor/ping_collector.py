@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     # Execução manual para teste rápido: python -m coletor.ping_collector
     coletor = PingCollector(host="8.8.8.8", intervalo_segundos=2.0)
-    armazenamento_csv = ArmazenamentoCSV(caminho_arquivo="dados/medicoes.csv")
+    armazenamento_csv = ArmazenamentoCSV()
     callback_com_armazenamento = _criar_callback_com_armazenamento(armazenamento_csv)
 
     try:

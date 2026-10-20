@@ -541,5 +541,61 @@ class DadosTest(unittest.TestCase):
         self.assertEqual(taxas.iloc[2], 100)
 
 
+class CaminhosTest(unittest.TestCase):
+    def resolver(self, plataforma, ambiente=None, **variaveis):
+        from armazenamento.armazenamento import obter_pasta_dados
+
+        env = dict(variaveis)
+        if ambiente is not None:
+            env["NETSTAT_AMBIENTE"] = ambiente
+        with patch.dict(os.environ, env, clear=True), patch("sys.platform", plataforma), patch("pathlib.Path.home", return_value=self.home):
+            return Path(obter_pasta_dados())
+
+    def setUp(self):
+        self.temporario = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporario.cleanup)
+        self.home = Path(self.temporario.name)
+
+    def test_perfis_windows_linux_macos(self):
+        for plataforma, base, dev, prod in (
+            ("win32", self.home / "AppData" / "Local", "NetStat-Dev", "NetStat"),
+            ("linux", self.home / ".local" / "share", "netstat-dev", "netstat"),
+            ("darwin", self.home / "Library" / "Application Support", "NetStat-Dev", "NetStat"),
+        ):
+            for ambiente, nome in ((None, dev), ("", dev), ("desenvolvimento", dev), ("producao", prod)):
+                with self.subTest(plataforma=plataforma, ambiente=ambiente):
+                    destino = self.resolver(plataforma, ambiente)
+                    self.assertEqual(destino, base / nome / "dados")
+                    self.assertFalse(destino.exists())
+
+    def test_variaveis_da_plataforma_e_fallbacks(self):
+        for plataforma, variavel, nome in (("win32", "LOCALAPPDATA", "NetStat-Dev"), ("linux", "XDG_DATA_HOME", "netstat-dev")):
+            with self.subTest(plataforma=plataforma):
+                self.assertEqual(self.resolver(plataforma, **{variavel: str(self.home)}), self.home / nome / "dados")
+                for valor in ("", "relativo"):
+                    self.assertEqual(self.resolver(plataforma, **{variavel: valor}), self.resolver(plataforma))
+
+    def test_destino_personalizado_absoluto_tem_precedencia(self):
+        for plataforma in ("win32", "linux", "darwin"):
+            with self.subTest(plataforma=plataforma):
+                self.assertEqual(self.resolver(plataforma, "invalido", NETSTAT_PASTA_DADOS=str(self.home)), self.home)
+                self.assertEqual(self.resolver(plataforma, NETSTAT_PASTA_DADOS=""), self.resolver(plataforma))
+                with self.assertRaises(ValueError):
+                    self.resolver(plataforma, NETSTAT_PASTA_DADOS="dados")
+                with self.assertRaises(ValueError):
+                    self.resolver(plataforma, "invalido")
+
+    def test_defaults_gravam_no_destino_configurado(self):
+        pasta = self.home / "destino"
+        relatorios = pasta / "relatorios"
+        with patch("armazenamento.armazenamento.PASTA_DADOS", str(pasta)), patch("analise.gerar_relatorio.PASTA_DADOS", str(pasta)), patch("analise.gerar_relatorio.PASTA_RELATORIOS", str(relatorios)):
+            self.assertIn("Nenhum arquivo", gerar_relatorio_consolidado(None))
+            csv = ArmazenamentoCSV()
+            self.assertEqual(Path(csv.caminho_arquivo), pasta / "medicoes.csv")
+            self.assertEqual(Path(caminho_coleta("wan", "8.8.8.8", "WiFi", None)).parent, pasta)
+            self.assertEqual(Path(salvar_relatorio("teste", None)).parent, relatorios)
+            self.assertIn("medicoes.csv", gerar_relatorio_consolidado(None))
+
+
 if __name__ == "__main__":
     unittest.main()
