@@ -1,4 +1,3 @@
-import hashlib
 import tempfile
 import unittest
 from datetime import datetime
@@ -40,15 +39,18 @@ class CaracterizacaoTest(unittest.TestCase):
         self.caminho = Path(self.pasta.name) / "wan_8.8.8.8_wifi.csv"
         self.caminho.write_text(CSV, encoding="utf-8")
 
-    def test_relatorio_integral_permanece_identico(self):
+    def test_relatorio_prioriza_resumo_e_preserva_resultados(self):
         with patch("analise.gerar_relatorio.datetime") as relogio:
             relogio.now.return_value = datetime(2026, 10, 17, 12)
             relatorio = gerar_relatorio_consolidado(self.pasta.name)
-        # Assinatura do Markdown produzido antes da reescrita, com relógio fixo.
-        self.assertEqual(
-            hashlib.sha256(relatorio.encode()).hexdigest(),
-            "72115dc49704c7e86cc5bf9484f1e5e03e733a151c3bd8d548c8902af4a17d01",
-        )
+        self.assertIn("17/10/2026 12:00", relatorio)
+        self.assertLess(relatorio.index("## 1. Resumo"), relatorio.index("## 3. Análise detalhada"))
+        self.assertIn("5 de 6 tentativas", relatorio)
+        self.assertIn("16,67%", relatorio)
+        self.assertIn("28,60 / 11,00 ms", relatorio)
+        self.assertIn("39,92 ms", relatorio)
+        self.assertIn("Picos superiores (IQR) | 1 (20,00%)", relatorio)
+        self.assertIn("p-valor é apenas nominal", relatorio)
 
     def test_estatisticas_e_outliers_usam_dados_brutos(self):
         df = carregar_medicoes(self.caminho)

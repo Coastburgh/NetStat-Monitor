@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from analise.estatisticas import (
+    analisar_perfil_horario,
     calcular_correlacao_horario_latencia,
     calcular_estatisticas_descritivas,
     carregar_medicoes,
@@ -133,6 +134,123 @@ class DadosTest(unittest.TestCase):
         with patch("analise.gerar_relatorio.resumir_medicoes", wraps=resumir_medicoes) as resumir:
             gerar_relatorio_consolidado(self.pasta)
         resumir.assert_called_once()
+
+    def test_perfil_horario_aceita_ausencias_e_hora_sem_respostas(self):
+        for dados in (None, pd.DataFrame(), medicoes_vazias()):
+            with self.subTest(dados=type(dados)):
+                self.assertEqual(analisar_perfil_horario(dados), [])
+        df = pd.DataFrame({
+            "timestamp": pd.to_datetime(["2026-10-01 23:59", "2026-10-02 00:00", "2026-10-02 00:01"]),
+            "latencia_ms": [10, None, None],
+        })
+        perfil = analisar_perfil_horario(df)
+        self.assertEqual([h["hora"] for h in perfil], [0, 23])
+        self.assertEqual(perfil[0]["perda_pct"], 100)
+        self.assertIsNone(perfil[0]["mediana_ms"])
+        self.assertEqual(perfil[1]["mediana_ms"], 10)
+
+    def test_perfil_identifica_pico_diario_e_exclui_rajada_sem_cobertura(self):
+        linhas = []
+        for dia in range(1, 4):
+            for hora, latencia in [(0, 10), (6, 10), (12, 80), (18, 10)]:
+                for minuto in range(30):
+                    linhas.append({"timestamp": pd.Timestamp(2026, 10, dia, hora, minuto), "latencia_ms": latencia})
+        # Muitas amostras no mesmo minuto não equivalem a uma hora acompanhada.
+        linhas.extend({"timestamp": pd.Timestamp(2026, 10, 1, 9), "latencia_ms": 1000} for _ in range(60))
+        perfil = {h["hora"]: h for h in analisar_perfil_horario(pd.DataFrame(linhas))}
+        self.assertEqual(perfil[12]["mediana_coberta_ms"], 80)
+        self.assertEqual(perfil[12]["dias_pior_latencia"], 3)
+        self.assertEqual(perfil[12]["dias_comparaveis"], 3)
+        self.assertEqual(perfil[9]["dias_com_cobertura"], 0)
+        self.assertIsNone(perfil[9]["mediana_coberta_ms"])
+        self.assertEqual(perfil[0]["dias_pior_latencia"], 0)
+        df = pd.DataFrame(linhas)
+        df["host"], df["jitter_ms"], df["perda_pacotes_pct"] = "8.8.8.8", None, 0
+        df.to_csv(self.csv, index=False)
+        relatorio = gerar_relatorio_consolidado(self.pasta)
+        self.assertIn("Maior latência típica observada: 12h (80,00 ms)", relatorio)
+        self.assertIn("3 de 3 dia(s)", relatorio)
+        self.assertNotIn("Maior latência típica observada: 09h", relatorio)
+
+    def test_cobertura_limite_empates_e_dias_parciais(self):
+        linhas = []
+        for hora, minutos, valor in [(8, 29, 90), (9, 30, 10), (10, 30, 10)]:
+            linhas.extend({"timestamp": pd.Timestamp(2026, 10, 1, hora, minuto), "latencia_ms": valor}
+                          for minuto in range(minutos))
+        # Uma segunda data não pode contaminar o destaque dos dias-hora cobertos.
+        linhas.append({"timestamp": pd.Timestamp(2026, 10, 2, 9), "latencia_ms": 9999})
+        perfil = {h["hora"]: h for h in analisar_perfil_horario(pd.DataFrame(linhas))}
+        self.assertEqual(perfil[8]["dias_com_cobertura"], 0)
+        self.assertEqual(perfil[9]["dias"], 2)
+        self.assertEqual(perfil[9]["dias_com_cobertura"], 1)
+        self.assertEqual(perfil[9]["mediana_coberta_ms"], 10)
+        self.assertEqual(perfil[9]["dias_pior_latencia"], 0)
+        self.assertEqual(perfil[10]["dias_comparaveis"], 1)
+
+    def test_perda_horaria_inclui_falhas_e_horas_totalmente_inacessiveis(self):
+        df = pd.DataFrame({
+            "timestamp": pd.to_datetime(["2026-10-01 09:00", "2026-10-01 09:01", "2026-10-01 10:00"]),
+            "latencia_ms": [10, None, None],
+        })
+        perfil = analisar_perfil_horario(df)
+        self.assertEqual(perfil[0]["tentativas"], 2)
+        self.assertEqual(perfil[0]["validas"], 1)
+        self.assertEqual(perfil[0]["perda_pct"], 50)
+        self.assertEqual(perfil[1]["perda_pct"], 100)
+
+    def test_uma_resposta_entre_muitas_falhas_nao_sustenta_comparacao_de_latencia(self):
+        df = pd.DataFrame({
+            "timestamp": pd.date_range("2026-10-01 09:00", periods=30, freq="min"),
+            "latencia_ms": [10] + [None] * 29,
+        })
+        hora = analisar_perfil_horario(df)[0]
+        self.assertEqual(hora["dias_com_cobertura"], 1)
+        self.assertEqual(hora["mediana_ms"], 10)
+        self.assertIsNone(hora["mediana_coberta_ms"])
+        self.assertEqual(hora["dias_comparaveis"], 0)
+        self.assertEqual(hora["perda_coberta_pct"], 96.67)
+
+    def test_iqr_distingue_caudas_sem_erro_de_arredondamento(self):
+        df = pd.DataFrame({"latencia_ms": [1, 10, 10, 10, 10, 10, 10, 20]})
+        resumo = resumir_medicoes(df, detalhado=True)
+        self.assertEqual(resumo["iqr"]["iqr"], 0)
+        self.assertEqual(resumo["picos_superiores"], 1)
+        self.assertEqual(resumo["outliers_inferiores"], 1)
+        df = pd.DataFrame({"latencia_ms": [0.001] + [0.004] * 6 + [0.020]})
+        resumo = resumir_medicoes(df, detalhado=True)
+        self.assertEqual(resumo["picos_superiores"], 1)
+        self.assertEqual(resumo["outliers_inferiores"], 1)
+
+    def test_pearson_preserva_p_valor_pequeno_e_relatorio_evita_zero(self):
+        self.gravar("".join(f"2026-10-01T{hora:02d}:00:00,8.8.8.8,{hora * 10},1,0\n" for hora in range(10)))
+        with patch("analise.estatisticas.stats.pearsonr", return_value=(0.03, 0.0000193)):
+            correlacao = calcular_correlacao_horario_latencia(carregar_medicoes(self.csv))
+            self.assertEqual(correlacao["p_valor"], 0.0000193)
+            relatorio = gerar_relatorio_consolidado(self.pasta)
+        self.assertIn("p-valor nominal < 0,0001", relatorio)
+        self.assertNotIn("significativa", relatorio)
+        self.assertIn("r próximo de zero não descarta horários ruins", relatorio)
+
+    def test_relatorio_mostra_perda_total_sem_latencia_e_uma_resposta_sem_desvio(self):
+        self.gravar("2026-10-01T10:00:00,8.8.8.8,,,100\n")
+        relatorio = gerar_relatorio_consolidado(self.pasta)
+        self.assertIn("100,00%", relatorio)
+        self.assertIn("0 de 1 tentativas", relatorio)
+        self.assertNotIn("None", relatorio)
+        self.gravar("2026-10-01T10:00:00,8.8.8.8,10,,0\n")
+        relatorio = gerar_relatorio_consolidado(self.pasta)
+        self.assertIn("Desvio padrão amostral | —", relatorio)
+        self.assertIn("Jitter mediano / P90 | — / —", relatorio)
+        self.assertIn("Amostra pequena", relatorio)
+        self.assertNotIn("None", relatorio)
+
+    def test_relatorio_avisa_exclusao_de_csv_invalido_sem_perder_resumo(self):
+        self.gravar("2026-10-01T10:00:00,8.8.8.8,10,,0\n")
+        (self.pasta / "invalido.csv").write_text("timestamp,host\n", encoding="utf-8")
+        relatorio = gerar_relatorio_consolidado(self.pasta)
+        self.assertIn("## 1. Resumo", relatorio)
+        self.assertIn("## Arquivos não analisados", relatorio)
+        self.assertIn("não representam toda a pasta", relatorio)
 
     def test_cache_invalida_com_medicoes_e_substituicao_mesmo_tamanho(self):
         _carregar_dados_monitor.clear()
