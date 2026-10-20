@@ -14,7 +14,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from analise.gerar_relatorio import exportar_relatorio_pdf
+from analise.gerar_relatorio import exportar_relatorio_html, exportar_relatorio_pdf
 from armazenamento.armazenamento import PASTA_RELATORIOS, excluir_arquivo_dados, listar_arquivos
 
 st.header("Preview Relatório Consolidado")
@@ -129,6 +129,12 @@ else:
         conteudo_pdf = None
         st.sidebar.warning(f"Não foi possível gerar o PDF: {erro}")
 
+    try:
+        conteudo_html = exportar_relatorio_html(conteudo)
+    except (OSError, ValueError) as erro:
+        conteudo_html = None
+        st.sidebar.warning(f"Não foi possível gerar o HTML: {erro}")
+
     with st.sidebar.popover("Exportar", type="primary", width="stretch"):
         st.download_button(
             "Markdown (.md)",
@@ -143,6 +149,14 @@ else:
                 data=conteudo_pdf,
                 file_name=os.path.splitext(arquivo_selecionado)[0] + ".pdf",
                 mime="application/pdf",
+                width="stretch",
+            )
+        if conteudo_html is not None:
+            st.download_button(
+                "HTML (.html)",
+                data=conteudo_html,
+                file_name=os.path.splitext(arquivo_selecionado)[0] + ".html",
+                mime="text/html",
                 width="stretch",
             )
 

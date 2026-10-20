@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from html.parser import HTMLParser
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,6 +19,8 @@ from analise.estatisticas import (
 from analise.gerar_relatorio import (
     _decorar_pagina_pdf,
     _formatar_texto_pdf,
+    _grafico_horario_html,
+    exportar_relatorio_html,
     exportar_relatorio_pdf,
     gerar_relatorio_consolidado,
     salvar_relatorio,
@@ -306,6 +309,110 @@ class DadosTest(unittest.TestCase):
             with self.subTest(conteudo=conteudo), patch("analise.gerar_relatorio.SimpleDocTemplate.build") as construir:
                 exportar_relatorio_pdf(conteudo)
                 self.assertEqual(construir.call_args.args[0], [])
+
+    def test_html_exporta_conteudo_salvo_com_navegacao_marca_e_data_original(self):
+        texto = (
+            "# Relatório consolidado — NetStat Monitor\n\n"
+            "Gerado automaticamente em 17/10/2026 12:34 a partir de 2 arquivo(s) de medições.\n\n"
+            "## 1. Resumo da conexão\n\n**Respostas:** 10 de 12 tentativas.\n\n"
+            "## 3. Análise detalhada\n\n### WAN — 8.8.8.8\n\n"
+            "| Métrica | Valor |\n|---|---|\n| Latência | `31,00 ms` |\n\n"
+            "> Dados limitados.\n\n## 4. Como interpretar\n\n"
+            "[SciPy](https://docs.scipy.org/)\n"
+        )
+        with patch("analise.gerar_relatorio.carregar_medicoes", side_effect=AssertionError("Não reler CSV")):
+            html = exportar_relatorio_html(texto)
+        self.assertIn('<html lang="pt-BR">', html)
+        self.assertIn('src="data:image/png;base64,', html)
+        self.assertEqual(html.count("Gerado automaticamente em 17/10/2026 12:34"), 1)
+        self.assertNotIn("a partir de", html)
+        self.assertIn('<a href="#secao-1">1. Resumo da conexão</a>', html)
+        self.assertIn('<h2 id="secao-1">1. Resumo da conexão</h2>', html)
+        self.assertIn('<details open><summary>WAN — 8.8.8.8</summary>', html)
+        self.assertEqual(html.count("<details"), html.count("</details>"))
+        self.assertIn("<b>Respostas:</b> 10 de 12 tentativas.", html)
+        self.assertIn("<code>31,00 ms</code>", html)
+        self.assertIn("<blockquote>Dados limitados.</blockquote>", html)
+        self.assertIn('<a href="https://docs.scipy.org/">SciPy</a>', html)
+        self.assertIn("<thead><tr><th>Métrica</th><th>Valor</th></tr></thead><tbody>", html.replace("\n", ""))
+
+    def test_html_aceita_ausencias_logo_indisponivel_e_quebras_de_linha(self):
+        for texto in (None, "", "\n \n"):
+            with self.subTest(texto=texto), patch("analise.gerar_relatorio.Path.read_bytes", side_effect=OSError("ausente")):
+                html = exportar_relatorio_html(texto)
+                self.assertIn('<span class="marca">NETSTAT MONITOR</span>', html)
+                self.assertIn("</body></html>", html)
+                self.assertNotIn("Gerado automaticamente", html)
+        texto = "## Resumo\n\nLatência: 31,25 ms.\n"
+        referencia = exportar_relatorio_html(texto)
+        for quebra in ("\n", "\r\n", "\r"):
+            with self.subTest(quebra=repr(quebra)):
+                self.assertEqual(exportar_relatorio_html(texto.replace("\n", quebra)), referencia)
+
+    def test_html_nao_executa_marcacao_arbitraria_do_relatorio(self):
+        texto = (
+            '## <img src=x onerror="alert(1)">\n\n<script>alert(1)</script>\n\n'
+            '| Campo | Valor |\n|---|---|\n| Código | `<svg onload="alert(1)">` |\n\n'
+            '[Perigoso](javascript:alert(1))\n'
+        )
+        html = exportar_relatorio_html(texto)
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("<svg", html)
+        self.assertNotIn('<img src=x', html)
+        self.assertNotIn('href="javascript:', html)
+        self.assertIn("&lt;script&gt;", html)
+
+    def test_grafico_html_preserva_lacunas_falhas_e_valores_da_tabela(self):
+        tabela = [
+            ["Hora", "Mediana (ms)", "P90 (ms)", "Sem resposta (%)"],
+            ["09h–10h", "31,25", "40,50", "0,25"],
+            ["11h–12h", "—", "—", "100,00"],
+        ]
+        for numero in (1, 2):
+            with self.subTest(numero=numero), patch("plotly.graph_objects.Figure.to_html", autospec=True, return_value="<grafico>") as converter:
+                self.assertEqual(_grafico_horario_html(tabela, numero), "<grafico>")
+                figura = converter.call_args.args[0]
+                self.assertEqual(figura.data[0].y[9], 31.25)
+                self.assertEqual(figura.data[1].y[9], 40.5)
+                self.assertEqual(figura.data[2].y[9], 0.25)
+                self.assertIsNone(figura.data[0].y[10])
+                self.assertIsNone(figura.data[2].y[10])
+                self.assertIsNone(figura.data[0].y[11])
+                self.assertEqual(figura.data[2].y[11], 100)
+                self.assertFalse(figura.data[0].connectgaps)
+                self.assertEqual(converter.call_args.kwargs["include_plotlyjs"], numero == 1)
+
+    def test_grafico_html_ignora_tabelas_ausentes_ou_incompativeis(self):
+        cabecalho = ["Hora", "Mediana (ms)", "P90 (ms)", "Sem resposta (%)"]
+        for tabela in ([], [["Métrica", "Valor"]], [cabecalho],
+                       [cabecalho, ["09h–10h"]], [cabecalho, ["25h–26h", "1", "2", "0"]],
+                       [cabecalho, ["09h–11h", "1", "2", "0"]],
+                       [cabecalho, ["09h–10h", "inválido", "2", "0"]]):
+            with self.subTest(tabela=tabela):
+                self.assertEqual(_grafico_horario_html(tabela, 1), "")
+
+    def test_html_incorpora_plotly_uma_vez_sem_recursos_externos(self):
+        tabela = "| Hora | Mediana (ms) | P90 (ms) | Sem resposta (%) |\n|---|---|---|---|\n| 09h–10h | 10,00 | 20,00 | 0,00 |\n"
+        texto = "## 3. Análise detalhada\n\n### LAN\n\n" + tabela + "\n### WAN\n\n" + tabela
+        html = exportar_relatorio_html(texto)
+        self.assertEqual(html.count("plotly.js v"), 1)
+        self.assertIn('id="perfil-horario-1"', html)
+        self.assertIn('id="perfil-horario-2"', html)
+
+        class Recursos(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.externos = []
+
+            def handle_starttag(self, tag, attrs):
+                atributos = dict(attrs)
+                endereco = atributos.get("src") or (atributos.get("href") if tag == "link" else None)
+                if endereco and not endereco.startswith("data:"):
+                    self.externos.append(endereco)
+
+        recursos = Recursos()
+        recursos.feed(html)
+        self.assertEqual(recursos.externos, [])
 
     def test_cache_invalida_com_medicoes_e_substituicao_mesmo_tamanho(self):
         _carregar_dados_monitor.clear()

@@ -12,11 +12,15 @@ pacotes), sem duplicar nenhuma lógica de cálculo.
 
 import os
 import re
+from base64 import b64encode
 from datetime import datetime
 from functools import partial
 from html import escape
 from io import BytesIO
 from pathlib import Path
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, portrait
@@ -37,20 +41,183 @@ from armazenamento.armazenamento import (
 )
 
 
-def _formatar_texto_pdf(texto: str) -> str:
-    """Converte a marcação inline usada nos relatórios para o formato do ReportLab."""
+def _formatar_texto_inline(texto: str, para_html: bool = False) -> str:
+    """Compartilha a marcação suportada pelos formatos sem aceitar HTML arbitrário."""
     texto = escape(texto)
     def converter(correspondencia):
         codigo, negrito, italico, rotulo, endereco = correspondencia.groups()
         if codigo is not None:
+            if para_html:
+                return f"<code>{codigo}</code>"
             return f'<font name="Courier">{codigo}</font>'
         if negrito is not None:
             return f"<b>{negrito}</b>"
         if italico is not None:
             return f"<i>{italico}</i>"
+        if para_html:
+            return f'<a href="{endereco}">{rotulo}</a>'
         return f'<link href="{endereco}" color="#007D91">{rotulo}</link>'
 
     return re.sub(r"`([^`]+)`|\*\*([^*]+)\*\*|(?<!\w)_([^_]+)_(?!\w)|\[([^\]]+)\]\((https://[^\s)]+)\)", converter, texto)
+
+
+def _formatar_texto_pdf(texto: str) -> str:
+    """Converte a marcação inline usada nos relatórios para o formato do ReportLab."""
+    return _formatar_texto_inline(texto)
+
+
+def _grafico_horario_html(tabela: list[list[str]], numero: int) -> str:
+    """Usa o retrato salvo no relatório, sem depender dos CSVs após a coleta."""
+    colunas = ("Hora", "Mediana (ms)", "P90 (ms)", "Sem resposta (%)")
+    if not tabela or not set(colunas).issubset(tabela[0]):
+        return ""
+    indices = [tabela[0].index(coluna) for coluna in colunas]
+    valores = {}
+    for linha in tabela[1:]:
+        if len(linha) <= max(indices):
+            return ""
+        hora = re.fullmatch(r"(\d{2})h[–-](\d{2})h", linha[indices[0]])
+        if hora is None or not 0 <= int(hora[1]) < 24 or int(hora[2]) != int(hora[1]) + 1:
+            return ""
+        try:
+            valores[int(hora[1])] = [
+                None if linha[indice] in ("—", "", "None") else float(linha[indice].replace(",", "."))
+                for indice in indices[1:]
+            ]
+        except ValueError:
+            return ""
+    if not valores:
+        return ""
+    horas = [f"{hora:02d}h" for hora in range(24)]
+    figura = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.12)
+    for indice, nome, cor in ((0, "Mediana", "#00ABC2"), (1, "P90", "#526171")):
+        figura.add_trace(go.Scatter(
+            x=horas, y=[valores.get(hora, [None] * 3)[indice] for hora in range(24)],
+            name=nome, mode="lines+markers", line_color=cor, connectgaps=False,
+            hovertemplate="%{x}: %{y:.2f} ms<extra>%{fullData.name}</extra>",
+        ), row=1, col=1)
+    figura.add_trace(go.Bar(
+        x=horas, y=[valores.get(hora, [None] * 3)[2] for hora in range(24)],
+        name="Sem resposta", marker_color="#00ABC2",
+        hovertemplate="%{x}: %{y:.2f}%<extra>Sem resposta</extra>",
+    ), row=2, col=1)
+    figura.update_yaxes(title_text="Latência (ms)", rangemode="tozero", row=1, col=1)
+    figura.update_yaxes(title_text="Sem resposta (%)", rangemode="tozero", row=2, col=1)
+    figura.update_layout(template="plotly_white", height=460, margin=dict(l=65, r=20, t=35, b=35),
+                         legend=dict(orientation="h", y=1.12), font=dict(family="Arial", color="#121922"))
+    return figura.to_html(full_html=False, include_plotlyjs=numero == 1,
+                          div_id=f"perfil-horario-{numero}", config={"responsive": True, "displaylogo": False})
+
+
+def exportar_relatorio_html(conteudo: str | None) -> str:
+    """Exporta um documento offline com a mesma análise, marca e gráficos horários."""
+    conteudo = conteudo or ""
+    geracao = re.search(r"^Gerado automaticamente em (\d{2}/\d{2}/\d{4} \d{2}:\d{2})", conteudo, re.MULTILINE)
+    logo = Path(__file__).resolve().parents[1] / "assets" / "NS_logo_long.png"
+    try:
+        marca = '<img alt="NetStat Monitor" src="data:image/png;base64,' + b64encode(logo.read_bytes()).decode("ascii") + '">'
+    except OSError:
+        marca = '<span class="marca">NETSTAT MONITOR</span>'
+    corpo, navegacao = [], []
+    linhas = conteudo.splitlines()
+    indice, graficos = 0, 0
+    analise_detalhada = detalhes_abertos = False
+    while indice < len(linhas):
+        linha = linhas[indice].strip()
+        if not linha or linha == "# Relatório consolidado — NetStat Monitor" or (geracao and linha.startswith(geracao.group(0))):
+            indice += 1
+            continue
+        if linha.startswith("|"):
+            tabela = []
+            while indice < len(linhas) and linhas[indice].strip().startswith("|"):
+                celulas = [celula.strip() for celula in linhas[indice].strip().strip("|").split("|")]
+                if not all(re.fullmatch(r":?-+:?", celula) for celula in celulas):
+                    tabela.append(celulas)
+                indice += 1
+            if tabela:
+                grafico = _grafico_horario_html(tabela, graficos + 1)
+                if grafico:
+                    graficos += 1
+                    corpo.extend(['<div class="grafico">', grafico, '</div>',
+                                  '<p class="legenda">Perfil por hora, conforme a tabela abaixo. '
+                                  'Passe o cursor para consultar valores; horas sem coleta permanecem sem valores.</p>'])
+                corpo.append('<div class="tabela"><table><thead>')
+                for numero, celulas in enumerate(tabela):
+                    if numero == 1:
+                        corpo.append('</thead><tbody>')
+                    tag = "th" if numero == 0 else "td"
+                    corpo.append("<tr>" + "".join(f"<{tag}>{_formatar_texto_inline(celula, True)}</{tag}>" for celula in celulas) + "</tr>")
+                corpo.append('</thead></table></div>' if len(tabela) == 1 else '</tbody></table></div>')
+            continue
+        titulo = re.match(r"^(#{1,4}) (.+)$", linha)
+        if titulo:
+            nivel, texto = len(titulo[1]), titulo[2]
+            if detalhes_abertos and nivel <= 3:
+                corpo.append('</details>')
+                detalhes_abertos = False
+            if nivel == 2:
+                analise_detalhada = texto.startswith("3. ")
+                identificador = f"secao-{len(navegacao) + 1}"
+                navegacao.append(f'<a href="#{identificador}">{_formatar_texto_inline(texto, True)}</a>')
+                corpo.append(f'<h2 id="{identificador}">{_formatar_texto_inline(texto, True)}</h2>')
+            elif nivel == 3 and analise_detalhada:
+                corpo.append(f'<details open><summary>{_formatar_texto_inline(texto, True)}</summary>')
+                detalhes_abertos = True
+            else:
+                corpo.append(f'<h{nivel}>{_formatar_texto_inline(texto, True)}</h{nivel}>')
+        elif linha.startswith("> "):
+            corpo.append(f'<blockquote>{_formatar_texto_inline(linha[2:], True)}</blockquote>')
+        else:
+            corpo.append(f'<p>{_formatar_texto_inline(linha, True)}</p>')
+        indice += 1
+    if detalhes_abertos:
+        corpo.append('</details>')
+    data = f'<p>Gerado automaticamente em {escape(geracao[1])}</p>' if geracao else ""
+    menu = '<nav aria-label="Seções do relatório">' + "".join(navegacao) + '</nav>' if navegacao else ""
+    return """<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatório Consolidado — NetStat Monitor</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #f2f5f8; color: #121922; font: 16px/1.6 Arial, sans-serif; }
+header { background: #121922; color: #e6edf3; border-bottom: 4px solid #00ABC2; }
+.cabecalho { max-width: 1200px; margin: auto; padding: 28px 32px; display: flex;
+align-items: center; justify-content: space-between; gap: 24px; }
+header img { width: 280px; max-width: 42%; height: auto; }
+header h1 { margin: 0; font-size: 26px; }
+header p { margin: 4px 0 0; font-size: 13px; }
+.titulo { text-align: right; }
+.marca { color: #00ABC2; font-weight: bold; }
+main { max-width: 1200px; margin: 24px auto; padding: 24px 32px; background: white; border-radius: 6px; }
+nav { display: flex; flex-wrap: wrap; gap: 12px 24px; padding-bottom: 16px; border-bottom: 1px solid #d3f1f5; }
+a, h2, h3, summary { color: #007d91; }
+h2 { margin-top: 32px; scroll-margin-top: 20px; }
+h3 { margin-top: 24px; }
+h4 { font-size: 16px; }
+blockquote { margin: 16px 0; padding: 12px 16px; background: #eaf8fa; border-left: 4px solid #00ABC2; }
+code { background: #f2f5f8; padding: 2px 4px; overflow-wrap: anywhere; }
+.tabela { overflow-x: auto; margin: 20px 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+th { background: #d3f1f5; border-bottom: 2px solid #00ABC2; }
+tbody tr:nth-child(even) { background: #f2f5f8; }
+details { margin: 20px 0; padding: 16px; border: 1px solid #d3f1f5; border-radius: 6px; }
+summary { cursor: pointer; font-size: 18px; font-weight: bold; }
+.grafico { min-width: 0; }
+.legenda, footer { font-size: 13px; color: #526171; }
+footer { padding: 16px; text-align: center; }
+@media (max-width: 640px) {
+.cabecalho { padding: 20px; flex-direction: column; align-items: flex-start; }
+header img { max-width: 100%; width: 240px; } .titulo { text-align: left; }
+main { margin: 12px; padding: 16px; } details { padding: 10px; } th, td { padding: 8px; }
+}
+@media print { body { background: white; } main { margin: 0; padding: 0; } nav { display: none; } }
+</style></head><body>
+<header><div class="cabecalho">""" + marca + '<div class="titulo"><h1>Relatório Consolidado</h1>' + data + """</div></div></header>
+<main>""" + menu + "\n".join(corpo) + """</main>
+<footer>NetStat Monitor | Análise de conectividade ICMP</footer>
+</body></html>"""
 
 
 def _decorar_pagina_pdf(canvas, documento, data_geracao: str | None = None):
