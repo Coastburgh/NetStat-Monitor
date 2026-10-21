@@ -259,6 +259,67 @@ with instancia_unica(Path(sys.argv[1])) as adquirida:
         registrar.assert_called_once_with("teste")
 
 
+class IconeWindowsTest(unittest.TestCase):
+    def test_quadros_do_icone_usam_bmp_compativel_com_winforms(self):
+        import struct
+
+        conteudo = (desktop.RAIZ / "assets/NS_logo_square.ico").read_bytes()
+        self.assertEqual(struct.unpack_from("<HH", conteudo), (0, 1))
+        quantidade = struct.unpack_from("<H", conteudo, 4)[0]
+        tamanhos = set()
+        for indice in range(quantidade):
+            entrada = 6 + 16 * indice
+            largura, altura = conteudo[entrada:entrada + 2]
+            tamanhos.add((largura or 256, altura or 256))
+            tamanho, inicio = struct.unpack_from("<II", conteudo, entrada + 8)
+            self.assertEqual(len(conteudo[inicio:inicio + tamanho]), tamanho)
+            self.assertEqual(struct.unpack_from("<I", conteudo, inicio)[0], 40)
+        self.assertEqual(tamanhos, {(n, n) for n in (16, 24, 32, 48, 64, 128, 256)})
+
+    @unittest.skipUnless(os.name == "nt", "A leitura pelo WinForms requer Windows.")
+    def test_leitura_nativa_preserva_pixels_do_icone(self):
+        from PIL import Image
+
+        # O Pillow tambem le PNG em ICO; o System.Drawing usado pelo pywebview pode corrompe-lo.
+        codigo = """
+import sys
+from pathlib import Path
+import clr
+clr.AddReference('System.Drawing')
+from System.Drawing import Icon
+from System.Drawing.Imaging import ImageFormat
+
+for tamanho in (16, 24, 32, 48, 64, 128):
+    icone = Icon(sys.argv[1], tamanho, tamanho)
+    try:
+        bitmap = icone.ToBitmap()
+        try:
+            bitmap.Save(str(Path(sys.argv[2]) / f'{tamanho}.png'), ImageFormat.Png)
+        finally:
+            bitmap.Dispose()
+    finally:
+        icone.Dispose()
+"""
+        caminho = desktop.RAIZ / "assets/NS_logo_square.ico"
+        with tempfile.TemporaryDirectory() as pasta:
+            resultado = subprocess.run(
+                [sys.executable, "-c", codigo, str(caminho), pasta],
+                capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+            with Image.open(caminho) as arquivo:
+                for tamanho in (16, 24, 32, 48, 64, 128):
+                    with self.subTest(tamanho=tamanho), Image.open(Path(pasta) / f"{tamanho}.png") as nativo:
+                        esperado = arquivo.ico.getimage((tamanho, tamanho)).convert("RGBA")
+                        atual = nativo.convert("RGBA")
+                        # Ignora RGB invisivel sob transparencia total.
+                        fundos = [Image.new("RGBA", imagem.size, "white") for imagem in (esperado, atual)]
+                        fundos[0].alpha_composite(esperado)
+                        fundos[1].alpha_composite(atual)
+                        self.assertEqual(fundos[0].size, fundos[1].size)
+                        self.assertEqual(fundos[0].tobytes(), fundos[1].tobytes())
+
+
 class ServidorLocalTest(unittest.TestCase):
     def test_inicializador_restaura_importacoes_em_python_isolado(self):
         codigo = """
