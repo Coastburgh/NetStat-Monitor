@@ -206,7 +206,7 @@ def executar(webview):
 
         janela.events.closing += fechar
         janela.events.closed += fechada.set
-        webview.start(acompanhar_servidor, gui="edgechromium")
+        webview.start(acompanhar_servidor, gui="edgechromium", icon=str(RAIZ / "assets" / "NS_logo_square.ico"))
     finally:
         try:
             servidor.parar()
@@ -236,6 +236,8 @@ def main() -> int:
     if sys.platform != "win32":
         informar("O inicializador desktop atende Windows. Neste sistema, use python -m streamlit run app.py.")
         return 1
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault("NETSTAT_AMBIENTE", "producao")
     try:
         from armazenamento.armazenamento import PASTA_APLICATIVO
 

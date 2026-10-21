@@ -48,6 +48,7 @@ class DesktopTest(unittest.TestCase):
         )
         self.assertTrue(self.webview.settings["ALLOW_DOWNLOADS"])
         self.assertEqual(self.webview.start.call_args.kwargs["gui"], "edgechromium")
+        self.assertEqual(self.webview.start.call_args.kwargs["icon"], str(desktop.RAIZ / "assets" / "NS_logo_square.ico"))
         self.servidor.parar.assert_called_once()
 
     def test_fechar_aguarda_coleta_antes_de_parar_servidor(self):
@@ -130,6 +131,21 @@ class DesktopTest(unittest.TestCase):
         with patch("sys.platform", "win32"), patch("armazenamento.armazenamento.PASTA_APLICATIVO", str(arquivo)), contextlib.redirect_stderr(io.StringIO()) as saida:
             self.assertEqual(desktop.main(), 1)
         self.assertIn("Não foi possível preparar", saida.getvalue())
+
+    def test_executavel_seleciona_producao_sem_sobrescrever_ambiente_explicito(self):
+        for ambiente in (None, "desenvolvimento", "producao"):
+            with self.subTest(ambiente=ambiente), patch.dict(os.environ), patch("sys.platform", "win32"), patch.object(sys, "frozen", True, create=True), patch("desktop._executar_interface", return_value=0):
+                os.environ.pop("NETSTAT_AMBIENTE", None)
+                if ambiente is not None:
+                    os.environ["NETSTAT_AMBIENTE"] = ambiente
+                self.assertEqual(desktop.main(), 0)
+                self.assertEqual(os.environ["NETSTAT_AMBIENTE"], ambiente or "producao")
+
+    def test_codigo_fonte_nao_define_perfil_de_producao(self):
+        with patch.dict(os.environ), patch("sys.platform", "win32"), patch.object(sys, "frozen", False, create=True), patch("desktop._executar_interface", return_value=0):
+            os.environ.pop("NETSTAT_AMBIENTE", None)
+            self.assertEqual(desktop.main(), 0)
+            self.assertNotIn("NETSTAT_AMBIENTE", os.environ)
 
 
 class InstanciaELogsTest(unittest.TestCase):
