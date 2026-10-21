@@ -31,6 +31,8 @@ SetupIconFile=assets\NS_logo_square.ico
 CloseApplications=yes
 RestartApplications=no
 SetupLogging=yes
+; Atualiza o cache de icones do Explorer apos substituir o executavel.
+ChangesAssociations=yes
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"

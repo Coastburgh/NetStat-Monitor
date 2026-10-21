@@ -117,6 +117,16 @@ class InstaladorWindowsTest(unittest.TestCase):
                 prazo = time.monotonic() + 10
                 while (destino.exists() or (excluir and dados.exists())) and time.monotonic() < prazo:
                     time.sleep(0.1)
+                # A notificacao ao Explorer pode manter o log aberto apos remover a pasta.
+                prazo = time.monotonic() + 10
+                while True:
+                    try:
+                        log = log.replace(log.with_suffix(".concluido.log"))
+                        break
+                    except PermissionError:
+                        if time.monotonic() >= prazo:
+                            raise
+                        time.sleep(0.1)
                 self.assertFalse(destino.exists(), "O processo de desinstalacao ainda nao concluiu a limpeza.")
                 self.assertEqual(dados.exists(), existente and not excluir, log.read_text(encoding="utf-8-sig", errors="replace"))
                 if not excluir:
