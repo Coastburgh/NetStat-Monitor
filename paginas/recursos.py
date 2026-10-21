@@ -2,6 +2,8 @@
 
 import os
 import atexit
+import signal
+from collections.abc import Callable
 
 import streamlit as st
 
@@ -17,6 +19,20 @@ CAMPOS_CONFIGURACAO = {
     "tipo_conexao": "tipo_conexao_input",
     "intervalo": "intervalo_input",
 }
+_encerrar_servidor: Callable[[], None] | None = None
+
+
+def registrar_encerramento_servidor(acao: Callable[[], None] | None):
+    """Permite ao inicializador desktop coordenar a parada sem sinais do console."""
+    global _encerrar_servidor
+    _encerrar_servidor = acao
+
+
+def solicitar_parada_servidor():
+    if _encerrar_servidor is not None:
+        _encerrar_servidor()
+    else:
+        signal.raise_signal(signal.SIGINT)
 
 
 # --- Registro de coleta: vive no processo do servidor (não na sessão da aba) ---
