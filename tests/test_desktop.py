@@ -25,7 +25,7 @@ class DesktopTest(unittest.TestCase):
     def setUp(self):
         self.temporario = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporario.cleanup)
-        destino = patch("armazenamento.armazenamento.PASTA_DADOS", self.temporario.name)
+        destino = patch("armazenamento.armazenamento.PASTA_APLICATIVO", self.temporario.name)
         destino.start()
         self.addCleanup(destino.stop)
         self.janela = SimpleNamespace(
@@ -127,7 +127,7 @@ class DesktopTest(unittest.TestCase):
     def test_diretorio_invalido_nao_produz_excecao_na_inicializacao(self):
         arquivo = Path(self.temporario.name) / "arquivo"
         arquivo.touch()
-        with patch("sys.platform", "win32"), patch("armazenamento.armazenamento.PASTA_DADOS", str(arquivo)), contextlib.redirect_stderr(io.StringIO()) as saida:
+        with patch("sys.platform", "win32"), patch("armazenamento.armazenamento.PASTA_APLICATIVO", str(arquivo)), contextlib.redirect_stderr(io.StringIO()) as saida:
             self.assertEqual(desktop.main(), 1)
         self.assertIn("Não foi possível preparar", saida.getvalue())
 
@@ -334,7 +334,7 @@ finally:
 assert not servidor._thread.is_alive()
 """
         with tempfile.TemporaryDirectory() as pasta:
-            ambiente = {**os.environ, "NETSTAT_PASTA_DADOS": pasta}
+            ambiente = {**os.environ, "NETSTAT_PASTA_DADOS": str(Path(pasta) / "dados")}
             resultado = subprocess.run(
                 [sys.executable, "-c", codigo], cwd=desktop.RAIZ, env=ambiente,
                 capture_output=True, text=True, timeout=30,

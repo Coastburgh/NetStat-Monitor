@@ -53,7 +53,9 @@ def obter_pasta_dados() -> str:
 
 
 PASTA_DADOS = obter_pasta_dados()
-PASTA_RELATORIOS = os.path.join(PASTA_DADOS, "relatorios")
+PASTA_APLICATIVO = os.path.dirname(PASTA_DADOS)
+PASTA_RELATORIOS = os.path.join(PASTA_APLICATIVO, "relatorios")
+PASTA_GRAFICOS = os.path.join(PASTA_APLICATIVO, "graficos")
 PADRAO_NOME_ARQUIVO = re.compile(
     r"^(?P<camada>lan|man|wan)_(?P<host>.+)_(?P<sessao>wifi|ethernet)\.csv$"
 )

@@ -22,6 +22,9 @@ class InterfaceTest(unittest.TestCase):
         os.chdir(self.temporario.name)
         self.addCleanup(os.chdir, self.anterior)
         pasta_dados = str(Path(self.temporario.name) / "dados")
+        raiz = patch("armazenamento.armazenamento.PASTA_APLICATIVO", self.temporario.name)
+        raiz.start()
+        self.addCleanup(raiz.stop)
         for modulo in ("armazenamento.armazenamento", "analise.gerar_relatorio"):
             for campo, valor in (("PASTA_DADOS", pasta_dados), ("PASTA_RELATORIOS", str(Path(pasta_dados) / "relatorios"))):
                 substituicao = patch(f"{modulo}.{campo}", valor)

@@ -41,7 +41,7 @@ def solicitar_parada_servidor():
 # sessão as reencontre, mostre o estado correto e consiga pará-las.
 @st.cache_resource
 def obter_controlador() -> ControladorColeta:
-    caminho = os.path.join(armazenamento.PASTA_DADOS, "configuracao.json")
+    caminho = os.path.join(armazenamento.PASTA_APLICATIVO, "configuracao.json")
     controlador = ControladorColeta(caminho_configuracao=caminho)
     atexit.register(controlador.encerrar)
     return controlador
