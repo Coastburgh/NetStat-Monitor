@@ -149,6 +149,12 @@ class ControleTest(unittest.TestCase):
                     self.assertEqual(ambiente["LC_ALL"], "C")
                 self.assertEqual(executar.call_args.kwargs["timeout"], 4)
 
+    def test_ping_oculta_console_apenas_no_windows(self):
+        for sistema in ("Windows", "Linux", "Darwin"):
+            with self.subTest(sistema=sistema), patch("coletor.ping_collector.platform.system", return_value=sistema), patch.object(subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), patch("coletor.ping_collector.subprocess.run", return_value=SimpleNamespace(stdout="time=10ms")) as executar:
+                self.assertEqual(PingCollector("127.0.0.1").coletar_uma_medicao()["latencia_ms"], 10)
+                self.assertEqual(executar.call_args.kwargs["creationflags"], 0x08000000 if sistema == "Windows" else 0)
+
     def test_ping_indisponivel_ou_timeout_conta_falha(self):
         for erro in [FileNotFoundError(), subprocess.TimeoutExpired("ping", 4)]:
             with self.subTest(erro=erro), patch("coletor.ping_collector.subprocess.run", side_effect=erro), contextlib.redirect_stdout(io.StringIO()):

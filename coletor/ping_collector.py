@@ -82,6 +82,7 @@ class PingCollector:
                 errors="replace",
                 timeout=self.timeout_segundos + 2,  # margem de segurança para o processo
                 env=None if self.sistema == "Windows" else {**os.environ, "LC_ALL": "C"},
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if self.sistema == "Windows" else 0,
             )
             latencia_ms = self._extrair_latencia_ms(resultado.stdout)
         except (OSError, subprocess.SubprocessError) as erro:

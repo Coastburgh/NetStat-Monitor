@@ -76,6 +76,7 @@ def detectar_gateway() -> str:
             resultado = subprocess.run(
                 ["powershell", "-NoProfile", "-Command", _PS_GATEWAY_WINDOWS],
                 capture_output=True, text=True, errors="replace", timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             candidato = resultado.stdout.strip()
             try:
@@ -123,6 +124,7 @@ def detectar_tipo_conexao() -> str:
             resultado = subprocess.run(
                 ["powershell", "-NoProfile", "-Command", _PS_TIPO_CONEXAO_WINDOWS],
                 capture_output=True, text=True, errors="replace", timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             tipo = resultado.stdout.strip()
             if tipo == "Native 802.11":
@@ -225,6 +227,7 @@ def detectar_primeiro_host_externo(destino: str = "8.8.8.8", max_saltos: int = 6
         resultado = subprocess.run(
             comando, capture_output=True, text=True, errors="replace", timeout=30,
             env=None if sistema == "Windows" else _env_idioma_neutro(),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if sistema == "Windows" else 0,
         )
     except (OSError, subprocess.SubprocessError) as erro:
         print(f"Aviso: falha ao executar traceroute/tracepath — {type(erro).__name__}: {erro}")
