@@ -116,7 +116,7 @@ jobs:
           Get-ChildItem dist/instalador -Filter *.exe | ForEach-Object {
             (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name
           } | Set-Content dist/instalador/SHA256SUMS.txt -Encoding ascii
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: netstat-windows-${{ steps.versao.outputs.versao }}
           path: |
@@ -135,7 +135,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: netstat-windows-${{ needs.empacotar.outputs.versao }}
           path: instalador
