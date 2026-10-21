@@ -421,6 +421,20 @@ class InterfaceTest(unittest.TestCase):
         self.assertFalse(at.exception)
         sinal.assert_called_once()
 
+    def test_encerrar_no_desktop_usa_callback_sem_sinal_do_console(self):
+        from paginas.recursos import registrar_encerramento_servidor
+        from unittest.mock import Mock
+
+        callback = Mock()
+        registrar_encerramento_servidor(callback)
+        self.addCleanup(registrar_encerramento_servidor, None)
+        at = self.app().run()
+        with patch("signal.raise_signal") as sinal:
+            at.button(key="encerrar").click().run()
+        self.assertFalse(at.exception)
+        callback.assert_called_once()
+        sinal.assert_not_called()
+
     def test_reinicio_do_controlador_restaura_widgets(self):
         at = self.app().run()
         at.text_input(key="wan_destino_input").set_value("1.1.1.1").run()

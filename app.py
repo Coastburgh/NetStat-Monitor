@@ -8,11 +8,10 @@ navegação e as ações comuns do painel (Monitor e Relatório).
 """
 
 import streamlit as st
-import signal
 from pathlib import Path
 from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
 from armazenamento.armazenamento import PASTA_DADOS, listar_arquivos
-from paginas.recursos import inicializar_estado, obter_controlador
+from paginas.recursos import inicializar_estado, obter_controlador, solicitar_parada_servidor
 
 st.set_page_config(page_title="NetStat Monitor", layout="wide")
 
@@ -54,8 +53,7 @@ with st.sidebar:
     if not st.session_state.coleta_ativa:
         if col_encerrar.button("ENCERRAR", key="encerrar", type="primary", width='stretch'):
             if obter_controlador().encerrar():
-                # Solicita a parada ao handler do Streamlit, inclusive no Windows.
-                signal.raise_signal(signal.SIGINT)
+                solicitar_parada_servidor()
                 st.stop()
             else:
                 st.sidebar.warning("A coleta ainda está encerrando. Aguarde e tente encerrar novamente.")
