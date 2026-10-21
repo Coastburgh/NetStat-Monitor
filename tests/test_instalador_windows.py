@@ -5,6 +5,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from unittest.mock import patch
 
 
 @unittest.skipUnless(os.name == "nt", "A ferramenta de instalacao atende apenas Windows.")
@@ -19,10 +20,13 @@ class InstaladorWindowsTest(unittest.TestCase):
 
     def executar(self, *argumentos):
         script = Path(__file__).resolve().parents[1] / "scripts" / "gerar_instalador.ps1"
+        # O PowerShell 5.1 deve reconstruir seus caminhos, sem herdar modulos do 7 via Python.
+        ambiente = {chave: valor for chave, valor in os.environ.items() if chave.upper() != "PSMODULEPATH"}
         return subprocess.run(
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(script), *argumentos],
             capture_output=True, text=True, errors="replace", timeout=30,
             creationflags=subprocess.CREATE_NO_WINDOW,
+            env=ambiente,
         )
 
     def test_rejeita_versao_invalida(self):
@@ -50,6 +54,22 @@ class InstaladorWindowsTest(unittest.TestCase):
         resultado = self.executar("-Versao", "0.1.0-dev", "-PastaPacote", str(self.pasta), "-Compilador", str(compilador), "-WebView2Setup", str(auxiliar))
         self.assertNotEqual(resultado.returncode, 0)
         self.assertIn("assinatura valida da Microsoft", resultado.stderr)
+
+    def test_powershell_nao_herda_modulos_incompativeis_da_sessao_pai(self):
+        modulos = self.pasta / "modulos"
+        modulo = modulos / "Microsoft.PowerShell.Security"
+        modulo.mkdir(parents=True)
+        (modulo / "Microsoft.PowerShell.Security.psd1").write_text(
+            "@{ ModuleVersion='7.0'; RootModule='incompativel.psm1'; FunctionsToExport=@('Get-AuthenticodeSignature') }",
+            encoding="ascii",
+        )
+        (modulo / "incompativel.psm1").write_text(
+            "throw 'Modulo incompativel simulado'\nfunction Get-AuthenticodeSignature {}",
+            encoding="ascii",
+        )
+        with patch.dict(os.environ, {"PSModulePath": str(modulos)}):
+            self.test_rejeita_auxiliar_sem_assinatura_microsoft()
+            self.assertEqual(os.environ["PSModulePath"], str(modulos))
 
     @unittest.skipUnless(os.environ.get("NETSTAT_TESTAR_INSTALADOR") == "1", "Requer compilador Inno Setup e teste de instalacao explicito.")
     def test_desinstalacao_preserva_ou_exclui_somente_os_dados_selecionados(self):
