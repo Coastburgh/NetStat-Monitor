@@ -63,6 +63,53 @@ class PontosEntradaTest(unittest.TestCase):
             )
             self.assertEqual(restaurar.returncode, 0, restaurar.stderr)
 
+    def test_saida_normal_do_python_aguarda_parada_da_coleta(self):
+        codigo = """
+import atexit
+import threading
+from coletor.ping_collector import PingCollector
+from paginas.recursos import obter_controlador
+
+def verificar():
+    if controle.camadas_ativas():
+        raise RuntimeError('A coleta permaneceu ativa.')
+    print('coleta_encerrada')
+
+atexit.register(verificar)
+controle = obter_controlador()
+mediu = threading.Event()
+
+def medir(coletor):
+    mediu.set()
+    return dict(host=coletor.host, latencia_ms=10, jitter_ms=None, perda_pacotes_pct=0)
+
+PingCollector.coletar_uma_medicao = medir
+controle.iniciar({'wan': '8.8.8.8'}, 'wifi', 30)
+assert mediu.wait(2)
+"""
+        with tempfile.TemporaryDirectory() as pasta:
+            resultado = self.executar(pasta, "-c", codigo)
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+            self.assertIn("coleta_encerrada", resultado.stdout)
+            self.assertNotIn("Exception ignored in atexit", resultado.stderr)
+
+    def test_sinal_de_encerramento_pode_ser_tratado_na_thread_principal(self):
+        codigo = """
+import signal
+import threading
+
+recebidos = []
+signal.signal(signal.SIGINT, lambda sinal, frame: recebidos.append(sinal))
+thread = threading.Thread(target=lambda: signal.raise_signal(signal.SIGINT))
+thread.start()
+thread.join(2)
+assert not thread.is_alive()
+assert recebidos == [signal.SIGINT]
+"""
+        with tempfile.TemporaryDirectory() as pasta:
+            resultado = self.executar(pasta, "-c", codigo)
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
     def test_modulos_sem_dados_exibem_mensagem_sem_traceback(self):
         with tempfile.TemporaryDirectory() as pasta:
             for modulo in ["analise.estatisticas", "visualizacao.graficos"]:

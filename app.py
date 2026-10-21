@@ -8,7 +8,6 @@ navegação e as ações comuns do painel (Monitor e Relatório).
 """
 
 import streamlit as st
-import os
 import signal
 from pathlib import Path
 from analise.gerar_relatorio import gerar_relatorio_consolidado, salvar_relatorio
@@ -54,8 +53,12 @@ with st.sidebar:
     col_gerar, col_encerrar = st.columns(2)
     if not st.session_state.coleta_ativa:
         if col_encerrar.button("ENCERRAR", key="encerrar", type="primary", width='stretch'):
-            obter_controlador().parar()
-            os.kill(os.getpid(), signal.SIGTERM)
+            if obter_controlador().encerrar():
+                # Solicita a parada ao handler do Streamlit, inclusive no Windows.
+                signal.raise_signal(signal.SIGINT)
+                st.stop()
+            else:
+                st.sidebar.warning("A coleta ainda está encerrando. Aguarde e tente encerrar novamente.")
         if col_gerar.button("Gerar Relatório", key="gerar", disabled=not arquivos_disponiveis, type="primary", width='stretch'):
             try:
                 with st.spinner("Consolidando medições e gerando relatório..."):

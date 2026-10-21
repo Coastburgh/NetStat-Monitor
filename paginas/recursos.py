@@ -1,6 +1,7 @@
 """Recursos compartilhados e cache de leitura usados pelas páginas do painel."""
 
 import os
+import atexit
 
 import streamlit as st
 
@@ -25,7 +26,9 @@ CAMPOS_CONFIGURACAO = {
 @st.cache_resource
 def obter_controlador() -> ControladorColeta:
     caminho = os.path.join(armazenamento.PASTA_DADOS, "configuracao.json")
-    return ControladorColeta(caminho_configuracao=caminho)
+    controlador = ControladorColeta(caminho_configuracao=caminho)
+    atexit.register(controlador.encerrar)
+    return controlador
 
 
 def inicializar_estado():
