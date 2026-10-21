@@ -15,7 +15,7 @@ import os
 import pandas as pd
 import plotly.graph_objects as go
 
-from armazenamento.armazenamento import PASTA_DADOS
+from armazenamento.armazenamento import PASTA_DADOS, PASTA_GRAFICOS
 
 from analise.estatisticas import (
     detectar_outliers_iqr,
@@ -49,7 +49,7 @@ def agregar_por_intervalo(
 def gerar_grafico_serie_temporal(
     df: pd.DataFrame,
     coluna: str = "latencia_ms",
-    caminho_saida: str = os.path.join(PASTA_DADOS, "graficos/grafico_serie_temporal.html"),
+    caminho_saida: str = os.path.join(PASTA_GRAFICOS, "grafico_serie_temporal.html"),
     titulo: str = "Latência ao longo do tempo",
     rotulo_eixo_y: str = "Latência (ms)",
     agregacao: str = "15min",
@@ -179,7 +179,7 @@ def calcular_taxa_perda_por_janela(df: pd.DataFrame, janela: str = "5min") -> pd
 def gerar_grafico_taxa_perda_pacotes(
     df: pd.DataFrame,
     janela: str = "5min",
-    caminho_saida: str = os.path.join(PASTA_DADOS, "graficos/grafico_perda_pacotes.html"),
+    caminho_saida: str = os.path.join(PASTA_GRAFICOS, "grafico_perda_pacotes.html"),
     titulo: str = "Perda de Pacotes",
     cor_grafico: str = "#ff1c02",
     salvar_arquivo: bool = True
@@ -232,32 +232,32 @@ if __name__ == "__main__":
     gerar_grafico_serie_temporal(
         df,
         coluna="latencia_ms",
-        caminho_saida=os.path.join(PASTA_DADOS, "graficos/grafico_latencia_cabo.html"),
+        caminho_saida=os.path.join(PASTA_GRAFICOS, "grafico_latencia_cabo.html"),
         titulo="Latência ao longo do tempo — 8.8.8.8 (Ethernet)",
         rotulo_eixo_y="Latência (ms)",
         agregacao="15min",
         cor_grafico="#0073ff"
     )
-    print("Gráfico de latência salvo em: " + os.path.join(PASTA_DADOS, "graficos", "grafico_latencia_cabo.html"))
+    print("Gráfico de latência salvo em: " + os.path.join(PASTA_GRAFICOS, "grafico_latencia_cabo.html"))
  
     gerar_grafico_serie_temporal(
         df,
         coluna="jitter_ms",
-        caminho_saida=os.path.join(PASTA_DADOS, "graficos/grafico_jitter_cabo.html"),
+        caminho_saida=os.path.join(PASTA_GRAFICOS, "grafico_jitter_cabo.html"),
         titulo="Jitter ao longo do tempo — 8.8.8.8 (Ethernet)",
         rotulo_eixo_y="Jitter (ms)",
         agregacao="15min",
         cor_grafico="#00ABC2"
     )
-    print("Gráfico de jitter salvo em: " + os.path.join(PASTA_DADOS, "graficos", "grafico_jitter_cabo.html"))
+    print("Gráfico de jitter salvo em: " + os.path.join(PASTA_GRAFICOS, "grafico_jitter_cabo.html"))
  
     gerar_grafico_taxa_perda_pacotes(
         df,
         janela="5min",
-        caminho_saida=os.path.join(PASTA_DADOS, "graficos/grafico_perda_pacotes_cabo.html"),
+        caminho_saida=os.path.join(PASTA_GRAFICOS, "grafico_perda_pacotes_cabo.html"),
         titulo="Taxa de perda de pacotes — 8.8.8.8 (Ethernet)",
     )
-    print("Gráfico de perda de pacotes salvo em: " + os.path.join(PASTA_DADOS, "graficos", "grafico_perda_pacotes_cabo.html"))
+    print("Gráfico de perda de pacotes salvo em: " + os.path.join(PASTA_GRAFICOS, "grafico_perda_pacotes_cabo.html"))
  
     perda_total = calcular_perda_pacotes_total(df)
     print(f"\nResumo — perda de pacotes total da sessão: {perda_total}%")

@@ -10,6 +10,32 @@ RAIZ = Path(__file__).resolve().parents[1]
 
 
 class PontosEntradaTest(unittest.TestCase):
+    def test_dados_contem_apenas_csvs(self):
+        codigo = """
+from pathlib import Path
+from armazenamento.armazenamento import PASTA_APLICATIVO, PASTA_DADOS, PASTA_RELATORIOS, PASTA_GRAFICOS, ArmazenamentoCSV
+from paginas.recursos import obter_controlador
+from analise.gerar_relatorio import salvar_relatorio
+from desktop import instancia_unica, registrar_logs
+
+raiz = Path(PASTA_APLICATIVO)
+assert Path(PASTA_DADOS) == raiz / 'dados'
+assert Path(PASTA_RELATORIOS) == raiz / 'relatorios'
+assert Path(PASTA_GRAFICOS) == raiz / 'graficos'
+ArmazenamentoCSV()
+obter_controlador().atualizar_configuracao({'wan': '1.1.1.1'})
+salvar_relatorio('teste')
+with instancia_unica(raiz) as adquirida, registrar_logs(raiz) as log:
+    assert adquirida
+    assert log == raiz / 'logs' / 'netstat.log'
+assert (raiz / 'configuracao.json').is_file()
+assert (raiz / '.desktop.lock').is_file()
+assert all(p.is_file() and p.suffix == '.csv' for p in Path(PASTA_DADOS).iterdir())
+"""
+        with tempfile.TemporaryDirectory() as pasta:
+            resultado = self.executar(pasta, "-c", codigo)
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
     def executar(self, pasta, *argumentos):
         ambiente = {**os.environ, "PYTHONPATH": str(RAIZ), "PYTHONIOENCODING": "utf-8", "NETSTAT_PASTA_DADOS": str(Path(pasta) / "dados")}
         return subprocess.run(
@@ -27,8 +53,8 @@ class PontosEntradaTest(unittest.TestCase):
                     resultado = self.executar(pasta, "-m", modulo)
                     self.assertEqual(resultado.returncode, 0, resultado.stderr)
                     self.assertTrue(resultado.stdout)
-            self.assertEqual(len(list((Path(pasta) / "dados/relatorios").glob("*.md"))), 1)
-            self.assertEqual(len(list((Path(pasta) / "dados/graficos").glob("*.html"))), 3)
+            self.assertEqual(len(list((Path(pasta) / "relatorios").glob("*.md"))), 1)
+            self.assertEqual(len(list((Path(pasta) / "graficos").glob("*.html"))), 3)
 
     def test_destino_nao_muda_com_diretorio_de_execucao(self):
         with tempfile.TemporaryDirectory() as pasta:
@@ -53,7 +79,7 @@ class PontosEntradaTest(unittest.TestCase):
                 "obter_controlador().atualizar_configuracao({'wan': '1.1.1.1', 'intervalo': 12.0})",
             )
             self.assertEqual(salvar.returncode, 0, salvar.stderr)
-            self.assertTrue((Path(pasta) / "dados" / "configuracao.json").is_file())
+            self.assertTrue((Path(pasta) / "configuracao.json").is_file())
             restaurar = self.executar(
                 pasta, "-c", "from paginas.recursos import obter_controlador; "
                 "controle = obter_controlador(); "

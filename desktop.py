@@ -206,7 +206,7 @@ def executar(webview):
 
         janela.events.closing += fechar
         janela.events.closed += fechada.set
-        webview.start(acompanhar_servidor, gui="edgechromium")
+        webview.start(acompanhar_servidor, gui="edgechromium", icon=str(RAIZ / "assets" / "NS_logo_square.ico"))
     finally:
         try:
             servidor.parar()
@@ -236,14 +236,16 @@ def main() -> int:
     if sys.platform != "win32":
         informar("O inicializador desktop atende Windows. Neste sistema, use python -m streamlit run app.py.")
         return 1
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault("NETSTAT_AMBIENTE", "producao")
     try:
-        from armazenamento.armazenamento import PASTA_DADOS
+        from armazenamento.armazenamento import PASTA_APLICATIVO
 
-        with instancia_unica(Path(PASTA_DADOS)) as adquirida:
+        with instancia_unica(Path(PASTA_APLICATIVO)) as adquirida:
             if not adquirida:
                 informar("O NetStat Monitor já está em execução para esta pasta de dados.")
                 return 0
-            with registrar_logs(Path(PASTA_DADOS)) as caminho_log:
+            with registrar_logs(Path(PASTA_APLICATIVO)) as caminho_log:
                 LOGGER.info("Inicializando aplicativo desktop")
                 try:
                     return _executar_interface(caminho_log)

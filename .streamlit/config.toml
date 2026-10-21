@@ -1,3 +1,7 @@
+[global]
+# O executável também deve servir os recursos estáticos do Streamlit.
+developmentMode = false
+
 [theme]
 base = "dark"
 primaryColor = "#00ABC2"

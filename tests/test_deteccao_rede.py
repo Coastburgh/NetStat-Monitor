@@ -9,6 +9,13 @@ from coletor import deteccao_rede as rede
 
 
 class DeteccaoRedeTest(unittest.TestCase):
+    def test_comandos_ocultam_console_apenas_no_windows(self):
+        for sistema in ("Windows", "Linux", "Darwin"):
+            for detectar in (rede.detectar_gateway, rede.detectar_tipo_conexao, rede.detectar_primeiro_host_externo):
+                with self.subTest(sistema=sistema, detectar=detectar.__name__), patch.object(rede.platform, "system", return_value=sistema), patch.object(rede.subprocess, "CREATE_NO_WINDOW", 0x08000000, create=True), patch.object(rede.subprocess, "run", return_value=SimpleNamespace(stdout="")) as executar:
+                    detectar()
+                    self.assertEqual(executar.call_args.kwargs.get("creationflags", 0), 0x08000000 if sistema == "Windows" else 0)
+
     def test_gateway_windows_sem_dependencia_de_idioma(self):
         for saida, esperado in [("192.168.1.1\r\n", "192.168.1.1"), ("", None), ("0.0.0.0", None), ("inválido", None)]:
             with self.subTest(saida=saida), patch.object(rede.platform, "system", return_value="Windows"), patch.object(rede.subprocess, "run", return_value=SimpleNamespace(stdout=saida)) as executar:

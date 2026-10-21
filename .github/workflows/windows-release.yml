@@ -1,0 +1,154 @@
+name: Testes e distribuicao Windows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: 'Versao do instalador de teste (ex.: 0.1.0-dev.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Testes (${{ matrix.sistema }})
+    runs-on: ${{ matrix.sistema }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        sistema: [windows-2022, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14.5'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements-desktop.txt
+      - name: Verificar dependencias
+        run: python -m pip check
+      - name: Executar testes
+        run: python -m unittest discover -s tests -q
+
+  empacotar:
+    name: Gerar instalador Windows
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
+    needs: testes
+    runs-on: windows-2022
+    timeout-minutes: 30
+    outputs:
+      versao: ${{ steps.versao.outputs.versao }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Determinar versao
+        id: versao
+        env:
+          VERSAO_MANUAL: ${{ inputs.versao }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'push') {
+            $versao = $env:GITHUB_REF_NAME.Substring(1)
+            git merge-base --is-ancestor HEAD origin/main
+            if ($LASTEXITCODE -ne 0) { throw 'A tag de Release deve apontar para um commit integrado a main.' }
+          } else {
+            $versao = $env:VERSAO_MANUAL
+          }
+          if ($versao -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?\z') {
+            throw 'Versao invalida. Use tres numeros e, opcionalmente, um sufixo como -rc.1.'
+          }
+          foreach ($parte in (($versao -split '-', 2)[0].Split('.'))) {
+            if ([long]$parte -gt 65535) { throw 'Cada componente da versao deve ser menor ou igual a 65535.' }
+          }
+          "versao=$versao" >> $env:GITHUB_OUTPUT
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14.5'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Instalar dependencias de empacotamento
+        run: python -m pip install -r requirements-build.txt
+      - name: Preparar Inno Setup e WebView2
+        run: |
+          $ferramentas = New-Item -ItemType Directory -Force dist/.tools
+          $inno = Join-Path $ferramentas.FullName 'innosetup-6.7.3.exe'
+          $webview = Join-Path $ferramentas.FullName 'MicrosoftEdgeWebview2Setup.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $inno
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webview
+          foreach ($arquivo in @($inno, $webview)) {
+            $assinatura = Get-AuthenticodeSignature -LiteralPath $arquivo
+            if ($assinatura.Status -ne 'Valid') { throw "Assinatura invalida: $arquivo" }
+          }
+          if ((Get-AuthenticodeSignature $inno).SignerCertificate.Subject -notmatch '(^|,\s*)O=Pyrsys B\.V\.(,|$)') {
+            throw 'Publicador inesperado do Inno Setup.'
+          }
+          if ((Get-AuthenticodeSignature $webview).SignerCertificate.Subject -notmatch '(^|,\s*)O=Microsoft Corporation(,|$)') {
+            throw 'Publicador inesperado do WebView2.'
+          }
+          $destino = Join-Path $ferramentas.FullName 'inno'
+          $processo = Start-Process -FilePath $inno -ArgumentList @('/PORTABLE=1', '/CURRENTUSER', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', ('/DIR="' + $destino + '"'), '/NOICONS') -WindowStyle Hidden -Wait -PassThru
+          if ($processo.ExitCode -ne 0) { throw "Falha ao preparar Inno Setup: $($processo.ExitCode)" }
+      - name: Testar instalador e desinstalador isolados
+        env:
+          NETSTAT_TESTAR_INSTALADOR: '1'
+        run: python -m unittest discover -s tests -p test_instalador_windows.py -q
+      - name: Gerar executavel
+        run: python -m PyInstaller --noconfirm --workpath dist/.pyinstaller NetStat-Monitor.spec
+      - name: Gerar instalador
+        env:
+          VERSAO: ${{ steps.versao.outputs.versao }}
+        run: ./scripts/gerar_instalador.ps1 -Versao $env:VERSAO -Compilador ./dist/.tools/inno/ISCC.exe
+      - name: Gerar checksum SHA256
+        run: |
+          Get-ChildItem dist/instalador -Filter *.exe | ForEach-Object {
+            (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + $_.Name
+          } | Set-Content dist/instalador/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: netstat-windows-${{ steps.versao.outputs.versao }}
+          path: |
+            dist/instalador/*.exe
+            dist/instalador/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: Criar Release em rascunho
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: empacotar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: netstat-windows-${{ needs.empacotar.outputs.versao }}
+          path: instalador
+      - name: Conferir checksum
+        working-directory: instalador
+        run: sha256sum --check SHA256SUMS.txt
+      - name: Criar rascunho com instalador e checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          argumentos=(--draft --verify-tag --generate-notes --title "NetStat Monitor $GITHUB_REF_NAME")
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            argumentos+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" instalador/*.exe instalador/SHA256SUMS.txt "${argumentos[@]}"
