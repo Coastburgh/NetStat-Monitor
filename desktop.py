@@ -11,6 +11,9 @@ from pathlib import Path
 
 
 RAIZ = Path(__file__).resolve().parent
+# O Python embutido pode omitir a raiz do projeto do caminho de importacao.
+if str(RAIZ) not in sys.path:
+    sys.path.insert(0, str(RAIZ))
 
 
 class ServidorLocal:

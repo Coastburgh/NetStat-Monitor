@@ -102,6 +102,25 @@ class DesktopTest(unittest.TestCase):
 
 
 class ServidorLocalTest(unittest.TestCase):
+    def test_inicializador_restaura_importacoes_em_python_isolado(self):
+        codigo = """
+import importlib.util
+import runpy
+import sys
+from pathlib import Path
+
+raiz = Path(sys.argv[1])
+sys.path[:] = [p for p in sys.path if p and Path(p).resolve() != raiz]
+runpy.run_path(str(raiz / 'desktop.py'), run_name='desktop_isolado')
+assert sys.path[0] == str(raiz)
+assert importlib.util.find_spec('paginas').origin == str(raiz / 'paginas' / '__init__.py')
+"""
+        resultado = subprocess.run(
+            [sys.executable, "-I", "-c", codigo, str(desktop.RAIZ)],
+            capture_output=True, text=True, timeout=15,
+        )
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
     def test_coleta_ausente_ou_lenta(self):
         servidor = desktop.ServidorLocal()
         self.assertTrue(servidor.encerrar_coleta())
