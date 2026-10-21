@@ -1,6 +1,8 @@
 import asyncio
 import contextlib
+import errno
 import io
+import logging
 import os
 import subprocess
 import sys
@@ -21,6 +23,11 @@ class Evento(list):
 
 class DesktopTest(unittest.TestCase):
     def setUp(self):
+        self.temporario = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporario.cleanup)
+        destino = patch("armazenamento.armazenamento.PASTA_DADOS", self.temporario.name)
+        destino.start()
+        self.addCleanup(destino.stop)
         self.janela = SimpleNamespace(
             events=SimpleNamespace(closing=Evento(), closed=Evento()), destroy=Mock(),
         )
@@ -99,6 +106,141 @@ class DesktopTest(unittest.TestCase):
         with patch("sys.platform", "win32"), patch.dict(sys.modules, {"webview": self.webview}), patch("desktop.executar", side_effect=RuntimeError("WebView2 indisponível")), contextlib.redirect_stderr(io.StringIO()) as saida:
             self.assertEqual(desktop.main(), 1)
         self.assertIn("WebView2 indisponível", saida.getvalue())
+        log = Path(self.temporario.name) / "logs" / "netstat.log"
+        self.assertIn("WebView2 indisponível", log.read_text(encoding="utf-8"))
+
+    def test_segunda_instancia_nao_inicia_interface_nem_abre_log(self):
+        pasta = Path(self.temporario.name)
+        with desktop.instancia_unica(pasta), patch("sys.platform", "win32"), patch("desktop._executar_interface") as executar, contextlib.redirect_stderr(io.StringIO()) as saida:
+            self.assertEqual(desktop.main(), 0)
+        executar.assert_not_called()
+        self.assertIn("já está em execução", saida.getvalue())
+        self.assertFalse((pasta / "logs").exists())
+
+    def test_falha_ao_abrir_log_e_informada_e_libera_trava(self):
+        with patch("sys.platform", "win32"), patch("desktop.RotatingFileHandler", side_effect=PermissionError("sem acesso")), contextlib.redirect_stderr(io.StringIO()) as saida:
+            self.assertEqual(desktop.main(), 1)
+        self.assertIn("sem acesso", saida.getvalue())
+        with desktop.instancia_unica(Path(self.temporario.name)) as adquirida:
+            self.assertTrue(adquirida)
+
+    def test_diretorio_invalido_nao_produz_excecao_na_inicializacao(self):
+        arquivo = Path(self.temporario.name) / "arquivo"
+        arquivo.touch()
+        with patch("sys.platform", "win32"), patch("armazenamento.armazenamento.PASTA_DADOS", str(arquivo)), contextlib.redirect_stderr(io.StringIO()) as saida:
+            self.assertEqual(desktop.main(), 1)
+        self.assertIn("Não foi possível preparar", saida.getvalue())
+
+
+class InstanciaELogsTest(unittest.TestCase):
+    def setUp(self):
+        self.temporario = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporario.cleanup)
+        self.pasta = Path(self.temporario.name)
+
+    def executar_processo(self, codigo):
+        return subprocess.run(
+            [sys.executable, "-c", codigo, str(self.pasta)], cwd=desktop.RAIZ,
+            capture_output=True, text=True, timeout=15,
+        )
+
+    def test_trava_bloqueia_outro_processo_e_libera_apos_saida(self):
+        codigo = """
+import sys
+from pathlib import Path
+from desktop import instancia_unica
+with instancia_unica(Path(sys.argv[1])) as adquirida:
+    print(adquirida)
+"""
+        with desktop.instancia_unica(self.pasta) as adquirida:
+            self.assertTrue(adquirida)
+            segundo = self.executar_processo(codigo)
+            self.assertEqual(segundo.returncode, 0, segundo.stderr)
+            self.assertEqual(segundo.stdout.strip(), "False")
+        terceiro = self.executar_processo(codigo)
+        self.assertEqual(terceiro.returncode, 0, terceiro.stderr)
+        self.assertEqual(terceiro.stdout.strip(), "True")
+
+    def test_queda_do_processo_nao_deixa_trava_obsoleta(self):
+        codigo = """
+import os
+import sys
+from pathlib import Path
+from desktop import instancia_unica
+with instancia_unica(Path(sys.argv[1])) as adquirida:
+    assert adquirida
+    os._exit(0)
+"""
+        resultado = self.executar_processo(codigo)
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+        self.assertTrue((self.pasta / ".desktop.lock").exists())
+        with desktop.instancia_unica(self.pasta) as adquirida:
+            self.assertTrue(adquirida)
+
+    def test_perfis_independentes_e_liberacao_apos_excecao(self):
+        with self.assertRaises(ValueError):
+            with desktop.instancia_unica(self.pasta) as primeira, desktop.instancia_unica(self.pasta / "outro") as segunda:
+                self.assertTrue(primeira and segunda)
+                raise ValueError("falha simulada")
+        with desktop.instancia_unica(self.pasta) as adquirida:
+            self.assertTrue(adquirida)
+
+    def test_erro_de_disco_nao_e_confundido_com_instancia_existente(self):
+        with patch("desktop._travar_arquivo", side_effect=OSError(errno.ENOSPC, "disco cheio")):
+            with self.assertRaises(OSError):
+                with desktop.instancia_unica(self.pasta):
+                    self.fail("A trava não deveria ter sido adquirida.")
+
+    def test_operacoes_de_trava_por_plataforma(self):
+        arquivo = Mock()
+        windows = SimpleNamespace(locking=Mock(), LK_NBLCK=1, LK_UNLCK=2)
+        with patch("os.name", "nt"), patch.dict(sys.modules, {"msvcrt": windows}):
+            desktop._travar_arquivo(arquivo)
+            desktop._travar_arquivo(arquivo, liberar=True)
+        self.assertEqual(windows.locking.call_args_list[0].args, (arquivo.fileno(), 1, 1))
+        self.assertEqual(windows.locking.call_args_list[1].args, (arquivo.fileno(), 2, 1))
+        for plataforma in ("linux", "darwin"):
+            posix = SimpleNamespace(flock=Mock(), LOCK_EX=1, LOCK_NB=2, LOCK_UN=4)
+            with self.subTest(plataforma=plataforma), patch("os.name", "posix"), patch("sys.platform", plataforma), patch.dict(sys.modules, {"fcntl": posix}):
+                desktop._travar_arquivo(arquivo)
+                desktop._travar_arquivo(arquivo, liberar=True)
+            self.assertEqual(posix.flock.call_args_list[0].args, (arquivo.fileno(), 3))
+            self.assertEqual(posix.flock.call_args_list[1].args, (arquivo.fileno(), 4))
+
+    def test_logs_utf8_registram_excecao_sem_ocultar_erro_da_interface(self):
+        handlers = list(logging.getLogger().handlers)
+        with desktop.registrar_logs(self.pasta) as caminho:
+            try:
+                raise ValueError("falha de conexão")
+            except ValueError as erro:
+                self.assertIsNone(desktop.registrar_erro_interface(erro))
+        texto = caminho.read_text(encoding="utf-8")
+        self.assertIn("ValueError: falha de conexão", texto)
+        self.assertEqual(texto.count("Falha na interface Streamlit"), 1)
+        self.assertEqual(logging.getLogger().handlers, handlers)
+
+    def test_logs_rotacionam_e_handler_e_removido_apos_excecao(self):
+        handlers = list(logging.getLogger().handlers)
+        with self.assertRaises(RuntimeError):
+            with desktop.registrar_logs(self.pasta) as caminho:
+                handler = logging.getLogger().handlers[-1]
+                handler.maxBytes = 150
+                for _ in range(6):
+                    desktop.LOGGER.warning("x" * 80)
+                raise RuntimeError("falha simulada")
+        self.assertTrue(caminho.is_file())
+        self.assertEqual(len(list(caminho.parent.glob("netstat.log*"))), 3)
+        self.assertEqual(logging.getLogger().handlers, handlers)
+
+    def test_aviso_sem_console_usa_mensagem_nativa(self):
+        with patch("sys.platform", "win32"), patch.object(sys, "stderr", None), patch("ctypes.WinDLL", create=True) as biblioteca:
+            desktop.informar("teste")
+        biblioteca.return_value.MessageBoxW.assert_called_once_with(None, "teste", "NetStat Monitor", 0x40)
+
+    def test_linux_sem_console_nao_tenta_usar_api_windows(self):
+        with patch("sys.platform", "linux"), patch.object(sys, "stderr", None), patch.object(desktop.LOGGER, "error") as registrar:
+            desktop.informar("teste")
+        registrar.assert_called_once_with("teste")
 
 
 class ServidorLocalTest(unittest.TestCase):
