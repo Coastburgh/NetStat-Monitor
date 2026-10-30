@@ -4,7 +4,7 @@
 
 O NetStat Monitor coleta e analisa métricas de rede em tempo real. Ele mede latência, jitter e perda de pacotes por ping, registra as medições em CSV e apresenta gráficos, estatísticas e relatórios em um painel interativo.
 
-Com o objetivo de facilitar o reconhecimento de possíveis pontos de falha, o NetStat Monitor possibilita o monitoramento simultâneo de destinos nas camadas LAN, MAN e WAN. Permitindo ao usuário determinar se o problema pode ser resolvido pessoalmente ou pela provedora. O sistema pode detectar o gateway e um host externo automaticamente, ou aceitar hosts informados pelo usuário.
+Para facilitar a identificação de possíveis pontos de falha, o NetStat Monitor monitora simultaneamente destinos nas camadas LAN, MAN e WAN, indicando em qual trecho a degradação se concentra (rede local, provedor ou destino externo). A camada MAN é uma aproximação (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)). O sistema pode detectar o gateway e um host externo automaticamente, ou aceitar hosts informados pelo usuário.
 
 ## Instalação e uso
 
@@ -43,6 +43,8 @@ O painel Streamlit controla a coleta de vários hosts em threads. Cada coletor e
 Cada linha de CSV representa uma medição:
 
     timestamp,host,latencia_ms,jitter_ms,perda_pacotes_pct
+
+O `timestamp` está em horário local, formato ISO 8601, sem fuso e com resolução de segundos. `latencia_ms` e `jitter_ms` vazios indicam ausência de resposta ou de referência anterior. `perda_pacotes_pct` é a perda acumulada desde o início da coleta (reinicia a cada nova coleta) e não é usada na análise, que recalcula a perda sobre as linhas brutas.
 
 O tipo de conexão fica no nome do arquivo, no formato `{rotulo_camada}_{host}_{rotulo_sessao}.csv`, por exemplo `wan_8.8.8.8_wifi.csv`. Os rótulos de camada são `lan`, `man` e `wan`; os de sessão são `wifi` e `ethernet`. A coluna `tipo_conexao` é reconstruída ao carregar os dados.
 
@@ -145,20 +147,52 @@ No PowerShell, `Resolve-Path` exige que a pasta já exista. Os exemplos pressup�
 
 As pastas de código possuem `__init__.py`.
 
-## Limitações do sistema e dos métodos
+## Limitações e pontos a rever
 
-### Capacidades e plataformas
+Esta versão é uma prova de conceito. As tabelas registram as fragilidades conhecidas, para orientar a reescrita. A aplicação usa ping para diagnóstico prático; não captura nem inspeciona pacotes e não substitui ferramentas especializadas.
 
-- Há instalador apenas para Windows x64. Linux já funciona pelo código-fonte; a instalação simplificada para Arch Linux está em desenvolvimento. No macOS, há caminho de execução pelo código-fonte, mas a execução nativa ainda não foi validada.
-- A aplicação usa ping para diagnóstico prático; não captura nem inspeciona pacotes e não substitui ferramentas especializadas. O armazenamento é exclusivamente em CSV.
-- Comparações estatísticas entre Wi-Fi e Ethernet ainda não foram aprofundadas. A validação com coletas extensivas em múltiplos dias está pendente.
+### Medição
 
-### Detecção e análise
+| Ponto | Situação atual | Direção para a reescrita |
+|---|---|---|
+| Sondagem | Um processo `ping` por medição (`-c 1`), com saída interpretada por regex (`coletor/ping_collector.py`) | Sondagem ICMP nativa, sem processo externo nem parsing de texto |
+| Resolução | No Windows, `time<1ms` é registrado como 1 ms | Temporização própria, em fração de milissegundo |
+| Idioma (Windows) | A regex cobre apenas `tempo=` e `time=`; no Linux e no macOS o comando roda com `LC_ALL=C` | Eliminada pela sondagem nativa |
+| Tipo de falha | Timeout, host inalcançável e TTL excedido são gravados da mesma forma (valor vazio) | Registrar o motivo de cada falha |
+| Protocolo | Apenas ICMP, que pode ser filtrado ou despriorizado por roteadores | Avaliar sondas adicionais (TCP, DNS) e documentar o viés |
+| Jitter | Diferença absoluta entre respostas válidas consecutivas, mesmo com falhas entre elas | Definir formalmente a métrica (referências a avaliar: RFC 2681, RFC 3393, RFC 3550) |
+| Perda | Coluna acumulada por coleta no CSV; a análise recalcula sobre as linhas brutas | Gravar cada tentativa e derivar a perda por janela |
 
-- A camada MAN é uma aproximação obtida pelo primeiro host externo em `traceroute`/`tracepath`; não identifica com precisão o provedor. No Linux, `tracepath` pode omitir a resposta do primeiro roteador externo e retornar o salto seguinte. Se a detecção falhar, os hosts podem ser informados manualmente.
-- A classificação automática de Wi-Fi e Ethernet usa a interface da rota padrão. Interfaces virtuais, como VPN e tethering, não são classificadas.
-- A detecção de outliers usa IQR; os histogramas, o teste t, o z-score e a comparação com o modelo M/M/1 não fazem parte do escopo confirmado. As médias por minuto servem à visualização, enquanto os outliers são calculados sobre as medições sem essa agregação.
-- A perda de pacotes exibida nos gráficos é calculada por janela de tempo, e não por um contador acumulado entre sessões. Taxas elevadas de outliers em hotspots móveis podem refletir as características dessa rede.
+### Dados
+
+| Ponto | Situação atual | Direção para a reescrita |
+|---|---|---|
+| Metadados | Camada, host e tipo de conexão no nome do arquivo, lidos por regex (`armazenamento/armazenamento.py`) | Entidade de sessão com metadados próprios; cada medição referencia a sessão |
+| Tipo de conexão | Rótulo único por sessão, não uma medição; fica incorreto se a interface mudar (troca de rede, VPN) | Registrar a interface por medição |
+| Sessões | Não há identificador; reinícios continuam no mesmo arquivo | Identificador, início, fim e parâmetros de cada sessão |
+| Timestamp | Local, sem fuso, em segundos | UTC com deslocamento e maior resolução |
+| Armazenamento | Apenas CSV; SQLite foi retirado desta versão | Reavaliar com o novo modelo de dados |
+
+### Detecção de rede
+
+- **Windows:** gateway e tipo de conexão dependem de PowerShell (`Get-NetRoute`, `Get-NetAdapter`), sujeito a bloqueio por política ou antivírus.
+- **Linux:** dependem de `ip route` e de `/sys/class/net/<dispositivo>/phy80211`, o que pode variar com o driver. Interfaces virtuais, como VPN e tethering, não são classificadas.
+- **macOS:** a detecção chama `ip`, que não existe por padrão no sistema; hosts informados manualmente funcionam. A execução nativa não foi validada.
+- **MAN:** aproximação pelo primeiro host externo obtido com `tracert`, `tracepath` ou `traceroute`; não identifica com precisão o provedor. No Linux, `tracepath` pode omitir a resposta do primeiro roteador externo e retornar o salto seguinte. Se a detecção falhar, os hosts podem ser informados manualmente.
+
+### Análise
+
+- A detecção de outliers usa IQR; histogramas, teste t, z-score e a comparação com o modelo M/M/1 não fazem parte do escopo confirmado. As médias por minuto servem à visualização, enquanto os outliers são calculados sobre as medições sem essa agregação.
+- A cobertura horária (30 minutos distintos por dia-hora) é um critério operacional, não estatístico.
+- Uma sessão corresponde a um tipo de conexão. Comparar Wi-Fi e Ethernet exige coletas em momentos diferentes, e a diferença observada pode refletir o horário, não a interface.
+- Medições consecutivas em rede tendem a ser autocorrelacionadas; esta versão não trata essa dependência.
+- Taxas elevadas de outliers em hotspots móveis podem refletir as características dessa rede.
+
+### Arquitetura e distribuição
+
+- A interface é um servidor Streamlit local; no Windows, é exibida em WebView2. Isso depende do runtime WebView2 e de um servidor HTTP local.
+- A coleta roda na mesma aplicação da interface; fechar a janela encerra a coleta.
+- Há instalador apenas para Windows x64. O Linux funciona pelo código-fonte, com instalação simplificada para Arch Linux em desenvolvimento; o macOS não foi validado.
 
 ## Contexto acadêmico
 
@@ -187,7 +221,9 @@ O acompanhamento de destinos LAN, MAN e WAN relaciona o projeto ao conteúdo de 
 - A agregação por minuto suaviza os gráficos, mas não é usada para detectar outliers, pois poderia ocultar picos reais.
 - O painel Streamlit passou a controlar a coleta; o antigo `main.py` de terminal foi descontinuado e sua lógica multi-host foi incorporada ao `app.py`.
 - O projeto manteve CSV como formato de armazenamento. SQLite, histogramas, teste t e comparação com M/M/1 foram avaliados e retirados do escopo confirmado.
+- A coleta extensiva de dados foi concluída.
 - Permanecem pendentes o aprofundamento da comparação Wi-Fi/Ethernet, o refinamento das visualizações e a inspeção manual de tráfego com Wireshark.
+- As decisões metodológicas acima valem para esta versão, uma prova de conceito, e serão revisadas na reescrita (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)).
 
 ## Licença
 
