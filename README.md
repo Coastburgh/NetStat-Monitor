@@ -2,105 +2,53 @@
     <img height="100" align="center" alt="netstat-logo" src="assets/NS_logo_long.png" />
 <p/>
 
-Projeto Integrador 2026/2 — Faculdade de Princípios Militares
+O NetStat Monitor coleta e analisa métricas de rede em tempo real. Ele mede latência, jitter e perda de pacotes por ping, registra as medições em CSV e apresenta gráficos, estatísticas e relatórios em um painel interativo.
 
-Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo
-Professor: Leonardo A. Portes
+Para facilitar a identificação de possíveis pontos de falha, o NetStat Monitor monitora simultaneamente destinos nas camadas LAN, MAN e WAN, indicando em qual trecho a degradação se concentra (rede local, provedor ou destino externo). A camada MAN é uma aproximação (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)). O sistema pode detectar o gateway e um host externo automaticamente, ou aceitar hosts informados pelo usuário.
 
----
+## Instalação e uso
 
-## Visão geral
+### Windows: instalador
 
-O NetStat Monitor é uma ferramenta para monitorar e analisar métricas de rede em tempo real, com foco em latência, jitter, perda de pacotes e comportamento de acesso à internet. O projeto coleta dados por ping em intervalos configuráveis, salva as medições em arquivos CSV e aplica análise estatística para caracterizar o comportamento da rede e identificar anomalias. Os resultados são apresentados em um painel interativo em Streamlit.
+Baixe o instalador `NetStat-Monitor-*-windows-x64-setup.exe` na página de [Releases](https://github.com/Coastburgh/NetStat-Monitor/releases), execute-o e abra **NetStat Monitor** pelo menu Iniciar. O instalador é destinado ao Windows 10 ou superior em arquitetura x64. Se necessário, ele instala o Microsoft Edge WebView2 durante a instalação. Não é preciso instalar Python para usar essa versão.
 
-A ideia central é permitir que uma mesma sessão de coleta compare diferentes camadas de rede (LAN, MAN e WAN) sem depender de configuração manual de IPs em todos os casos. Para isso, o sistema inclui detecção automática do gateway e do primeiro host externo do provedor. Essa organização por camadas conecta o projeto diretamente ao tópico "Tipos de redes (LAN, MAN, WAN)" da ementa de Introdução a Redes de Computadores.
+### Linux: uso pelo código-fonte
 
-## Requisitos
+O sistema já pode ser usado no Linux pelo código-fonte. É necessário Python 3.12 ou superior, `pip` e os comandos de rede `ping`, `ip` e `tracepath` para a coleta e a detecção automática. Também é recomendado a instalação das dependências em um ambiente virtual. Execute os comandos a seguir em um terminal:
 
-- Python 3.12 ou superior, conforme os requisitos das dependências fixadas;
-- pip;
-- ambiente virtual recomendado.
+```bash
+git clone https://github.com/Coastburgh/NetStat-Monitor.git
+cd NetStat-Monitor
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
 
-Dependências principais: streamlit, pandas, scipy, plotly e reportlab. O arquivo `requirements.txt` contém as dependências diretas e suas versões; numpy é instalado como dependência transitiva.
+O painel abre no navegador. Uma versão de instalação simplificada para Arch Linux está em desenvolvimento; ainda não há pacote ou instalador Linux publicado.
 
-## Instalação
+### Primeiros passos no painel
 
-1. Clone o repositório:
+1. Informe os hosts LAN, MAN e WAN ou use a detecção automática. O tipo de conexão (Wi-Fi ou Ethernet) também pode ser detectado.
+2. Ajuste o intervalo e inicie a coleta. É possível interrompê-la pelo painel.
+3. Consulte os gráficos de latência, jitter e perda de pacotes e os indicadores estatísticos.
+4. Gere o relatório consolidado e visualize ou exporte o resultado em Markdown, PDF ou HTML.
 
-       git clone https://github.com/Coastburgh/NetStat-Monitor.git
+## Como o sistema funciona
 
-2. Entre na pasta do projeto:
+O painel Streamlit controla a coleta de vários hosts em threads. Cada coletor executa `ping` periodicamente, calcula as métricas e entrega as medições ao armazenamento por callback. Os dados em CSV alimentam as visualizações, as estatísticas descritivas, a detecção de outliers por IQR, a correlação entre horário e latência e o relatório consolidado.
 
-       cd NetStat-Monitor
+### Dados e configurações
 
-3. Crie e ative um ambiente virtual:
+Cada linha de CSV representa uma medição:
 
-   Windows (PowerShell):
+    timestamp,host,latencia_ms,jitter_ms,perda_pacotes_pct
 
-       python -m venv .venv
-       .\.venv\Scripts\Activate.ps1
+O `timestamp` está em horário local, formato ISO 8601, sem fuso e com resolução de segundos. `latencia_ms` e `jitter_ms` vazios indicam ausência de resposta ou de referência anterior. `perda_pacotes_pct` é a perda acumulada desde o início da coleta (reinicia a cada nova coleta) e não é usada na análise, que recalcula a perda sobre as linhas brutas.
 
-   Caso a execução de scripts esteja bloqueada, execute uma vez:
+O tipo de conexão fica no nome do arquivo, no formato `{rotulo_camada}_{host}_{rotulo_sessao}.csv`, por exemplo `wan_8.8.8.8_wifi.csv`. Os rótulos de camada são `lan`, `man` e `wan`; os de sessão são `wifi` e `ethernet`. A coluna `tipo_conexao` é reconstruída ao carregar os dados.
 
-       Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-   Como alternativa, utilize o `cmd.exe` com `.venv\Scripts\activate.bat`.
-
-   Linux/macOS:
-
-       python -m venv .venv
-       source .venv/bin/activate
-
-4. Instale as dependências:
-
-       python -m pip install -r requirements.txt
-
-## Execução
-
-### Painel Streamlit
-
-    python -m streamlit run app.py
-
-Execute a partir da raiz do projeto. Os comandos com `python` pressupõem que a `.venv` esteja ativada. Sem ativá-la, utilize diretamente seu interpretador:
-
-Windows (PowerShell):
-
-    .\.venv\Scripts\python.exe -m streamlit run app.py
-
-Linux/macOS:
-
-    .venv/bin/python -m streamlit run app.py
-
-Na interface, é possível:
-
-- informar os hosts das camadas LAN, MAN e WAN;
-- detectar automaticamente o gateway, o primeiro host externo e o tipo de conexão (Wi-Fi ou Ethernet);
-- iniciar e interromper uma coleta;
-- encerrar a aplicação diretamente pelo painel (botão "ENCERRAR" na barra lateral);
-- visualizar gráficos de latência, jitter e perda de pacotes, além da latência instantânea da última leitura;
-- gerar o relatório consolidado (req. 20) e visualizá-lo em uma página exclusiva, com preview e exportação em Markdown, PDF e HTML.
-
-### Detecção automática de rede
-
-Para testar apenas a detecção de hosts das camadas de rede e do tipo de conexão:
-
-    python -m coletor.deteccao_rede
-
-### Coleta direta
-
-Para testes rápidos do módulo de coleta:
-
-    python -m coletor.ping_collector
-
-### Relatório consolidado
-
-Para gerar o relatório consolidado diretamente pelo terminal (sem o painel):
-
-    python -m analise.gerar_relatorio
-
-## Dados, ambientes e configurações
-
-Por padrão, a execução utiliza o ambiente `desenvolvimento`. Os dados são gravados no perfil do usuário, independentemente do diretório de execução:
+Por padrão, a execução pelo código-fonte usa o ambiente `desenvolvimento`. Os dados são gravados no perfil do usuário:
 
 | Sistema | Desenvolvimento (padrão) | Produção |
 |---|---|---|
@@ -108,205 +56,175 @@ Por padrão, a execução utiliza o ambiente `desenvolvimento`. Os dados são gr
 | Linux | `~/.local/share/netstat-dev/dados` | `~/.local/share/netstat/dados` |
 | macOS | `~/Library/Application Support/NetStat-Dev/dados` | `~/Library/Application Support/NetStat/dados` |
 
-No Linux, um `XDG_DATA_HOME` absoluto substitui a base `~/.local/share`. No Windows, se `LOCALAPPDATA` estiver ausente ou não for absoluto, a base utilizada é `~/AppData/Local`. As mudanças foram validadas manualmente no Windows e Linux; a execução nativa no macOS ainda não foi validada.
+No Linux, um `XDG_DATA_HOME` absoluto substitui a base `~/.local/share`. No Windows, se `LOCALAPPDATA` estiver ausente ou não for absoluto, a base utilizada é `~/AppData/Local`.
 
-### Seleção do ambiente
+Os hosts, o tipo de conexão, o intervalo e o modo automático são salvos em `configuracao.json` na pasta de dados. Os relatórios ficam na subpasta `relatorios/`. Ao reiniciar, os campos são restaurados, mas a coleta permanece parada. Arquivo ausente usa valores padrão; falhas de leitura ou gravação são informadas no painel. Se a gravação falhar, os valores permanecem em memória durante a execução.
 
-`NETSTAT_AMBIENTE` aceita `desenvolvimento` e `producao` (sem acento). Ausente ou vazia, utiliza `desenvolvimento`. Para selecionar produção:
+## Desenvolvimento
 
-Windows (PowerShell, com a `.venv` ativada):
+### Obter o código e instalar dependências
 
-    $env:NETSTAT_AMBIENTE = "producao"
-    python -m streamlit run app.py
+Use Python 3.12 ou superior e `pip`. Os comandos abaixo pressupõem execução na raiz do projeto.
 
-Após encerrar o programa, remova a variável para voltar ao padrão nesta sessão do terminal:
+```bash
+git clone https://github.com/Coastburgh/NetStat-Monitor.git
+cd NetStat-Monitor
+python -m venv .venv
+```
 
-    Remove-Item Env:NETSTAT_AMBIENTE
+Ative o ambiente virtual e instale as dependências:
 
-Linux/macOS (com a `.venv` ativada; a variável vale apenas para esse comando):
+| Sistema | Ativação |
+|---|---|
+| Windows PowerShell | `.\.venv\Scripts\Activate.ps1` |
+| Windows cmd.exe | `.venv\Scripts\activate.bat` |
+| Linux/macOS | `source .venv/bin/activate` |
 
-    NETSTAT_AMBIENTE=producao python -m streamlit run app.py
+```bash
+python -m pip install -r requirements.txt
+```
 
-### Diretório personalizado e dados existentes
+No PowerShell, se a execução de scripts estiver bloqueada, use `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` ou ative o ambiente no `cmd.exe`. `requirements.txt` contém as dependências diretas do painel; `requirements-desktop.txt` acrescenta as dependências do inicializador Windows e `requirements-build.txt` as de empacotamento.
 
-`NETSTAT_PASTA_DADOS` define diretamente a pasta de dados e tem prioridade sobre `NETSTAT_AMBIENTE`. O caminho deve ser absoluto; a variável não vazia é usada sem acrescentar outra pasta `dados`. A escolha é lida ao iniciar o processo: reinicie o programa para aplicar mudanças.
+### Executar e testar
 
-Os arquivos antigos na pasta `dados/` do projeto não são movidos nem excluídos automaticamente. Para continuar usando essa pasta:
+```bash
+python -m streamlit run app.py
+python -m unittest discover -s tests -q
+```
 
-Windows (PowerShell, com a `.venv` ativada; `Resolve-Path` exige que a pasta já exista):
+Com a `.venv` ativada, esses são os comandos de execução e teste para Windows, Linux e macOS. A execução nativa no macOS ainda não foi validada. Sem ativá-la, use `.\.venv\Scripts\python.exe` no Windows ou `.venv/bin/python` no Linux e macOS no lugar de `python`. Os testes usam diretórios temporários para isolar os arquivos gerados.
 
-    $env:NETSTAT_PASTA_DADOS = (Resolve-Path .\dados).Path
-    python -m streamlit run app.py
+Para executar módulos específicos:
 
-Após encerrar o programa, remova a configuração desta sessão do terminal:
+```bash
+python -m coletor.deteccao_rede
+python -m coletor.ping_collector
+python -m analise.gerar_relatorio
+```
 
-    Remove-Item Env:NETSTAT_PASTA_DADOS
+O primeiro comando testa a detecção de rede; o segundo, a coleta direta; o terceiro gera o relatório consolidado pelo terminal.
 
-Linux/macOS (com a `.venv` ativada, a partir da raiz do projeto):
+### Configuração do ambiente e dos dados
 
-    NETSTAT_PASTA_DADOS="$(pwd)/dados" python -m streamlit run app.py
+`NETSTAT_AMBIENTE` aceita `desenvolvimento` ou `producao` (sem acento). Ausente ou vazia, usa `desenvolvimento`. Para iniciar em produção:
 
-### Persistência das configurações
+```powershell
+$env:NETSTAT_AMBIENTE = "producao"
+python -m streamlit run app.py
+Remove-Item Env:NETSTAT_AMBIENTE
+```
 
-Os hosts LAN, MAN e WAN, o tipo de conexão, o intervalo e o modo automático são salvos a cada alteração em `configuracao.json`, dentro da pasta de dados selecionada. Os relatórios gerados ficam na subpasta `relatorios/`.
+```bash
+NETSTAT_AMBIENTE=producao python -m streamlit run app.py
+```
 
-Ao reiniciar o processo, os campos são restaurados, mas a coleta permanece parada até ser iniciada pelo usuário. A ação "Limpar Configuração" também é persistida. Arquivo ausente utiliza os valores padrão; configurações inválidas ou falhas de leitura e gravação são informadas no painel. Uma falha de gravação mantém os valores em memória durante a execução.
+O primeiro exemplo é para Windows PowerShell; o segundo, para Linux/macOS. `NETSTAT_PASTA_DADOS` define diretamente uma pasta de dados absoluta e tem prioridade sobre `NETSTAT_AMBIENTE`. A escolha é lida no início do processo, portanto mudanças exigem reinicialização. Os dados antigos na pasta `dados/` do projeto não são movidos nem excluídos automaticamente. Para continuar usando essa pasta:
 
-## Testes
+```powershell
+$env:NETSTAT_PASTA_DADOS = (Resolve-Path .\dados).Path
+python -m streamlit run app.py
+Remove-Item Env:NETSTAT_PASTA_DADOS
+```
 
-A partir da raiz do projeto, com a `.venv` ativada:
+```bash
+NETSTAT_PASTA_DADOS="$(pwd)/dados" python -m streamlit run app.py
+```
 
-    python -m unittest discover -s tests -q
+No PowerShell, `Resolve-Path` exige que a pasta já exista. Os exemplos pressupõem a `.venv` ativada.
 
-Sem ativar a `.venv`, utilize:
+### Arquitetura do projeto
 
-Windows (PowerShell):
+- `app.py` — entrada do painel Streamlit e navegação;
+- `desktop.py` — inicializador da interface Windows;
+- `paginas/` — páginas Monitor e Relatório;
+- `coletor/` — coleta por ping, controle de threads e detecção de rede;
+- `armazenamento/` — persistência em CSV e configurações;
+- `analise/` — estatísticas, identificação de padrões e relatório;
+- `visualizacao/` — gráficos;
+- `scripts/` — utilitários, incluindo geração de dados simulados e do instalador Windows;
+- `tests/` — testes automatizados.
 
-    .\.venv\Scripts\python.exe -m unittest discover -s tests -q
+As pastas de código possuem `__init__.py`.
 
-Linux/macOS:
+## Contexto acadêmico
 
-    .venv/bin/python -m unittest discover -s tests -q
+Projeto Integrador 2026/2 — Faculdade de Princípios Militares.
 
-Os testes usam diretórios temporários para isolar os arquivos gerados dos dados de uso normal.
+Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo. Professor: Leonardo A. Portes.
 
-## Fluxo de uso típico
+O acompanhamento de destinos LAN, MAN e WAN relaciona o projeto ao conteúdo de Introdução a Redes de Computadores. A análise das medições aplica conceitos de estatística descritiva e correlação.
 
-1. o usuário abre a aplicação em Streamlit;
-2. os hosts de cada camada são preenchidos manualmente ou detectados automaticamente;
-3. a coleta é iniciada em múltiplas threads;
-4. as medições são gravadas em CSV;
-5. gráficos e indicadores estatísticos são atualizados em tempo real.
-
-## Mudanças de escopo e evolução do projeto
-
-Durante a construção do projeto, alguns planos iniciais foram ajustados:
-
-- a comparação com o modelo teórico M/M/1 foi retirada do escopo confirmado, sem definição sobre uma implementação futura;
-- o painel Streamlit tornou-se parte central da solução, e não apenas uma extensão opcional — inclusive com controle completo de iniciar/parar a coleta pelo navegador, não só visualização;
-- o `main.py`, ponto de entrada original via terminal, foi descontinuado: sua lógica de coleta multi-host foi absorvida pelo `app.py`, eliminando a duplicação entre os dois pontos de entrada que existiu por um período do projeto;
-- a coleta foi estruturada para funcionar com múltiplos destinos simultâneos em diferentes camadas de rede (LAN/MAN/WAN), com nomeação de arquivo por rótulo de camada, host e tipo de conexão;
-- a detecção automática de rede passou a ser um recurso principal, para reduzir a configuração manual;
-- os histogramas de distribuição (requisito 17) e o teste de hipóteses / teste t (requisito 15) foram avaliados e **removidos definitivamente do escopo confirmado** do projeto — não estão em andamento nem previstos para retomada;
-- o armazenamento permaneceu em CSV exclusivamente; o suporte alternativo em SQLite (requisito 7) foi avaliado e removido do projeto;
-- o cronograma foi removido do documento de escopo, com definição posterior.
-
-## Funcionalidades implementadas
-
-- coleta periódica de latência via ping (req. 1, 2, 3);
-- cálculo de jitter (req. 5) e da taxa de perda de pacotes (req. 4);
-- suporte a múltiplos hosts simultâneos, com coleta em threads (req. 10);
-- tratamento de timeouts e hosts inacessíveis sem interromper a coleta (req. 8);
-- armazenamento em CSV (req. 6);
-- detecção automática do gateway padrão da rede local (LAN);
-- aproximação do primeiro host externo via traceroute/tracepath (MAN);
-- detecção automática do tipo de conexão (Wi-Fi ou Ethernet) a partir da interface usada pela rota padrão;
-- interface web com Streamlit para iniciar/parar a coleta e visualizar gráficos em tempo real (req. 19);
-- estatística descritiva com média, mediana, desvio padrão e percentis (req. 11);
-- identificação de outliers por IQR (req. 13) — z-score (req. 12) avaliado e removido;
-- destaque visual de outliers por IQR nos gráficos de série temporal, ativável por toggle no painel (req. 18);
-- correlação entre horário do dia e latência (req. 14);
-- geração automatizada de relatório consolidado em Markdown (req. 20), com página exclusiva no painel para preview e exportação em Markdown, PDF e HTML;
-- separação de dados por ambiente e persistência das configurações entre reinícios;
-- geração de dados simulados para desenvolvimento e testes.
-
-## Formato dos dados
-
-Cada linha de CSV representa uma medição, com o seguinte esquema:
-
-    timestamp,host,latencia_ms,jitter_ms,perda_pacotes_pct
-
-O tipo de conexão não é uma coluna do CSV: ele é registrado no nome do arquivo, no formato:
-
-    {pasta_de_dados}/{rotulo_camada}_{host}_{rotulo_sessao}.csv
-
-Exemplo: `wan_8.8.8.8_wifi.csv`. Os rótulos de camada utilizados são `lan`, `man` e `wan`; os rótulos de sessão armazenados são `wifi` e `ethernet`, exibidos como "Wi-Fi" e "Ethernet". A coluna `tipo_conexao` é reconstruída no carregamento dos dados, a partir do sufixo do nome do arquivo.
-
-## Relação com o conteúdo das disciplinas
+### Relação com as disciplinas
 
 | Tópico da ementa | Onde aparece no projeto |
 |---|---|
 | Medidas de posição e dispersão | Estatística descritiva (req. 11) |
-| Distribuições de probabilidade | Não coberto — dependia da comparação com Teoria das Filas, fora do escopo confirmado |
+| Distribuições de probabilidade | Não coberto; dependia da comparação com Teoria das Filas, fora do escopo confirmado |
 | Correlação | Correlação entre horário do dia e latência (req. 14) |
-| Testes de hipóteses (Z, t) | Ambos removidos do escopo confirmado — z-score por masking (req. 12); teste t (req. 15) não implementado |
-| Tipos de rede (LAN, MAN, WAN) | Hosts organizados e detectados automaticamente por camada |
-| Comandos de diagnóstico (ping, traceroute, ipconfig) | Base do coletor e da detecção automática de hosts |
-| Protocolos (ICMP) | Implícito na coleta via ping |
+| Testes de hipóteses (Z, t) | Removidos do escopo confirmado (req. 12 e 15) |
+| Tipos de rede (LAN, MAN, WAN) | Hosts organizados e detectados por camada |
+| Comandos de diagnóstico (ping, traceroute, ipconfig) | Base da coleta e da detecção de hosts |
+| Protocolos (ICMP) | Utilizado na coleta via ping |
 | Análise de pacotes com Wireshark | Atividade manual complementar, não incorporada ao código |
 
-## Decisões metodológicas
+### Decisões metodológicas e evolução
 
-- **Outliers por IQR, sem Z-score.** O Z-score foi avaliado e removido por pressupor distribuição normal e por sofrer mascaramento: os próprios outliers inflam o desvio padrão e deixam de ser detectados. Distribuições de latência de rede são assimétricas, com cauda longa à direita, o que torna o IQR mais robusto e adequado.
-- **Soluções simples primeiro.** Complexidade é adiada quando não é necessária de imediato (por exemplo, ainda não há coluna de tipo de erro no CSV).
-- **Teste t removido do escopo.** A comparação estatística entre grupos (ex.: Wi-Fi vs. Ethernet) por teste t foi avaliada, mas não faz mais parte do escopo confirmado do projeto.
-- **Agregação apenas na visualização.** Médias por minuto suavizam os gráficos de série temporal, mas nunca são usadas para detecção de outliers — agregar antes de detectar outliers mascararia picos reais.
-- **Perda de pacotes por janela, não cumulativa.** A taxa de perda exibida nos gráficos é recalculada por janela de tempo, evitando que o contador cumulativo (que reinicia a cada execução do coletor) esconda picos de instabilidade pontuais.
+- O IQR foi escolhido para identificar outliers porque as distribuições de latência tendem a ser assimétricas e valores extremos podem mascarar a detecção por z-score.
+- A agregação por minuto suaviza os gráficos, mas não é usada para detectar outliers, pois poderia ocultar picos reais.
+- O painel Streamlit passou a controlar a coleta; o antigo `main.py` de terminal foi descontinuado e sua lógica multi-host foi incorporada ao `app.py`.
+- O projeto manteve CSV como formato de armazenamento. SQLite, histogramas, teste t e comparação com M/M/1 foram avaliados e retirados do escopo confirmado.
+- A coleta extensiva de dados foi concluída.
+- Permanecem pendentes o aprofundamento da comparação Wi-Fi/Ethernet, o refinamento das visualizações e a inspeção manual de tráfego com Wireshark.
+- As decisões metodológicas acima valem para esta versão, uma prova de conceito, e serão revisadas na reescrita (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)).
 
-## Decisões de implementação
+## Limitações e pontos a rever
 
-- a coleta é desacoplada do armazenamento: o `PingCollector` utiliza callbacks;
-- o ping é executado via `subprocess`, com `platform.system()` para compatibilidade entre sistemas, evitando os problemas de privilégio da biblioteca `ping3` no Windows;
-- a coleta em múltiplos hosts utiliza threads, com `threading.Event` para permitir parar cada uma de forma controlada a partir da interface (necessário para o botão "Parar" do Streamlit, já que não há Ctrl+C dentro do navegador);
-- a detecção de rede usa PowerShell (`Get-NetRoute`) no Windows e `ip route` no Linux para o gateway; `tracert -d` (Windows), `tracepath` (Linux) ou `traceroute` (macOS) para o primeiro salto externo. No Windows, a leitura não depende do idioma do sistema (objetos do PowerShell e linhas de salto do `tracert`, sem rótulos traduzidos); no Linux e no macOS, os comandos rodam com `LC_ALL=C`;
-- a detecção do tipo de conexão cruza a rota padrão com o tipo físico da interface: no Windows, lê `PhysicalMediaType` do adaptador via PowerShell (`Native 802.11` = Wi-Fi, `802.3` = Ethernet); no Linux, extrai o dispositivo de `ip route show default` e verifica a existência de `/sys/class/net/<dev>/phy80211` (presente apenas em interfaces Wi-Fi), sem depender de `iw`/`iwconfig`. Interfaces virtuais (VPN, tethering) não são classificadas;
-- a pasta legada `dados/` do projeto está no `.gitignore`; por padrão, CSVs, relatórios e configurações ficam no perfil do usuário, conforme a seção "Dados, ambientes e configurações";
-- `scripts/gerar_dados_simulados.py` gera dados sintéticos para permitir o desenvolvimento sem depender do acúmulo de coletas reais.
+Esta versão é uma prova de conceito. As tabelas registram as fragilidades conhecidas, para orientar a reescrita. A aplicação usa ping para diagnóstico prático; não captura nem inspeciona pacotes e não substitui ferramentas especializadas.
 
-## Estrutura do projeto
+### Medição
 
-- app.py — ponto de entrada do painel Streamlit: configura a página e registra a navegação entre as demais;
-- paginas/ — páginas do painel Streamlit: Monitor (coleta e visualização) e Relatório (preview e download do relatório consolidado);
-- coletor/ — módulos de coleta e detecção de rede;
-- armazenamento/ — persistência dos dados coletados;
-- analise/ — cálculo estatístico, identificação de padrões e geração do relatório consolidado;
-- visualizacao/ — gráficos e visualizações;
-- dados/ — pasta legada de medições, ignorada pelo Git; pode ser selecionada explicitamente com `NETSTAT_PASTA_DADOS`;
-- scripts/ — utilitários de apoio e geração de dados simulados.
+| Ponto | Situação atual | Direção para a reescrita |
+|---|---|---|
+| Sondagem | Um processo `ping` por medição (`-c 1`), com saída interpretada por regex (`coletor/ping_collector.py`) | Sondagem ICMP nativa, sem processo externo nem parsing de texto |
+| Resolução | No Windows, `time<1ms` é registrado como 1 ms | Temporização própria, em fração de milissegundo |
+| Idioma (Windows) | A regex cobre apenas `tempo=` e `time=`; no Linux e no macOS o comando roda com `LC_ALL=C` | Eliminada pela sondagem nativa |
+| Tipo de falha | Timeout, host inalcançável e TTL excedido são gravados da mesma forma (valor vazio) | Registrar o motivo de cada falha |
+| Protocolo | Apenas ICMP, que pode ser filtrado ou despriorizado por roteadores | Avaliar sondas adicionais (TCP, DNS) e documentar o viés |
+| Jitter | Diferença absoluta entre respostas válidas consecutivas, mesmo com falhas entre elas | Definir formalmente a métrica (referências a avaliar: RFC 2681, RFC 3393, RFC 3550) |
+| Perda | Coluna acumulada por coleta no CSV; a análise recalcula sobre as linhas brutas | Gravar cada tentativa e derivar a perda por janela |
 
-Todas as pastas de código possuem `__init__.py`.
+### Dados
 
-## Status atual do projeto
+| Ponto | Situação atual | Direção para a reescrita |
+|---|---|---|
+| Metadados | Camada, host e tipo de conexão no nome do arquivo, lidos por regex (`armazenamento/armazenamento.py`) | Entidade de sessão com metadados próprios; cada medição referencia a sessão |
+| Tipo de conexão | Rótulo único por sessão, não uma medição; fica incorreto se a interface mudar (troca de rede, VPN) | Registrar a interface por medição |
+| Sessões | Não há identificador; reinícios continuam no mesmo arquivo | Identificador, início, fim e parâmetros de cada sessão |
+| Timestamp | Local, sem fuso, em segundos | UTC com deslocamento e maior resolução |
+| Armazenamento | Apenas CSV; SQLite foi retirado desta versão | Reavaliar com o novo modelo de dados |
 
-### Implementado
+### Detecção de rede
 
-- [x] coleta periódica via ping (req. 1, 2, 3);
-- [x] cálculo de jitter e perda de pacotes (req. 4, 5);
-- [x] monitoramento de múltiplos destinos por camada de rede (req. 10);
-- [x] tratamento de falhas e timeouts (req. 8);
-- [x] armazenamento em CSV (req. 6);
-- [x] detecção automática de gateway, provedor e tipo de conexão;
-- [x] painel Streamlit com controle completo de iniciar/parar (req. 19);
-- [x] estatísticas descritivas (req. 11);
-- [x] detecção de outliers por IQR (req. 13);
-- [x] correlação entre horário e latência (req. 14);
-- [x] destaque visual de outliers nos gráficos de série temporal (req. 18), ativável por toggle no painel;
-- [x] geração automatizada de relatório consolidado (req. 20), com exportação em Markdown, PDF e HTML;
-- [x] separação de dados de desenvolvimento e produção;
-- [x] persistência das configurações entre reinícios.
+- **Windows:** gateway e tipo de conexão dependem de PowerShell (`Get-NetRoute`, `Get-NetAdapter`), sujeito a bloqueio por política ou antivírus.
+- **Linux:** dependem de `ip route` e de `/sys/class/net/<dispositivo>/phy80211`, o que pode variar com o driver. Interfaces virtuais, como VPN e tethering, não são classificadas.
+- **macOS:** a detecção chama `ip`, que não existe por padrão no sistema; hosts informados manualmente funcionam. A execução nativa não foi validada.
+- **MAN:** aproximação pelo primeiro host externo obtido com `tracert`, `tracepath` ou `traceroute`; não identifica com precisão o provedor. No Linux, `tracepath` pode omitir a resposta do primeiro roteador externo e retornar o salto seguinte. Se a detecção falhar, os hosts podem ser informados manualmente.
 
-### Pendente
+### Análise
 
-- [ ] coleta extensiva em múltiplos dias para validação real;
-- [ ] comparação mais aprofundada entre Wi-Fi e Ethernet;
-- [ ] refinamento das visualizações;
-- [ ] captura e inspeção de tráfego com Wireshark (atividade manual, planejada para a etapa de relatório final).
+- A detecção de outliers usa IQR; histogramas, teste t, z-score e a comparação com o modelo M/M/1 não fazem parte do escopo confirmado. As médias por minuto servem à visualização, enquanto os outliers são calculados sobre as medições sem essa agregação.
+- A cobertura horária (30 minutos distintos por dia-hora) é um critério operacional, não estatístico.
+- Uma sessão corresponde a um tipo de conexão. Comparar Wi-Fi e Ethernet exige coletas em momentos diferentes, e a diferença observada pode refletir o horário, não a interface.
+- Medições consecutivas em rede tendem a ser autocorrelacionadas; esta versão não trata essa dependência.
+- Taxas elevadas de outliers em hotspots móveis podem refletir as características dessa rede.
 
-### Fora do escopo confirmado
+### Arquitetura e distribuição
 
-- [ ] histogramas de distribuição (req. 17) — avaliado e removido;
-- [ ] teste de hipóteses / teste t (req. 15) — avaliado e removido;
-- [ ] comparação com modelo teórico de Teoria das Filas (M/M/1);
-- [ ] comparação de desempenho entre TCP e UDP.
-
-## Observações importantes
-
-- o projeto é uma ferramenta prática de diagnóstico de rede, e não substitui ferramentas especializadas de análise de rede;
-- a camada MAN é uma aproximação baseada em traceroute, e não uma identificação exata do provedor;
-- no Linux, o `tracepath` às vezes não obtém resposta do primeiro roteador externo, retornando o segundo salto como resultado — um comportamento observado mesmo quando `traceroute`/`tracert`, no mesmo ambiente, conseguem detectar o primeiro. É uma limitação da técnica/rede, não um erro do sistema;
-- a detecção de gateway e do primeiro host externo é um recurso de apoio; o usuário pode ajustar os valores manualmente quando a detecção falha;
-- taxas elevadas de outliers no gateway de hotspot móvel decorrem das características da rede móvel, e não de erros de coleta.
+- A interface é um servidor Streamlit local; no Windows, é exibida em WebView2. Isso depende do runtime WebView2 e de um servidor HTTP local.
+- A coleta roda na mesma aplicação da interface; fechar a janela encerra a coleta.
+- Há instalador apenas para Windows x64. O Linux funciona pelo código-fonte, com instalação simplificada para Arch Linux em desenvolvimento; o macOS não foi validado.
 
 ## Licença
 
-[Licença MIT](LICENSE). Este projeto é destinado a fins acadêmicos e de desenvolvimento de software em contexto universitário.
+[Licença MIT](LICENSE). Projeto desenvolvido em contexto universitário.
