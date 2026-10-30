@@ -147,6 +147,37 @@ No PowerShell, `Resolve-Path` exige que a pasta já exista. Os exemplos pressup�
 
 As pastas de código possuem `__init__.py`.
 
+## Contexto acadêmico
+
+Projeto Integrador 2026/2 — Faculdade de Princípios Militares.
+
+Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo. Professor: Leonardo A. Portes.
+
+O acompanhamento de destinos LAN, MAN e WAN relaciona o projeto ao conteúdo de Introdução a Redes de Computadores. A análise das medições aplica conceitos de estatística descritiva e correlação.
+
+### Relação com as disciplinas
+
+| Tópico da ementa | Onde aparece no projeto |
+|---|---|
+| Medidas de posição e dispersão | Estatística descritiva (req. 11) |
+| Distribuições de probabilidade | Não coberto; dependia da comparação com Teoria das Filas, fora do escopo confirmado |
+| Correlação | Correlação entre horário do dia e latência (req. 14) |
+| Testes de hipóteses (Z, t) | Removidos do escopo confirmado (req. 12 e 15) |
+| Tipos de rede (LAN, MAN, WAN) | Hosts organizados e detectados por camada |
+| Comandos de diagnóstico (ping, traceroute, ipconfig) | Base da coleta e da detecção de hosts |
+| Protocolos (ICMP) | Utilizado na coleta via ping |
+| Análise de pacotes com Wireshark | Atividade manual complementar, não incorporada ao código |
+
+### Decisões metodológicas e evolução
+
+- O IQR foi escolhido para identificar outliers porque as distribuições de latência tendem a ser assimétricas e valores extremos podem mascarar a detecção por z-score.
+- A agregação por minuto suaviza os gráficos, mas não é usada para detectar outliers, pois poderia ocultar picos reais.
+- O painel Streamlit passou a controlar a coleta; o antigo `main.py` de terminal foi descontinuado e sua lógica multi-host foi incorporada ao `app.py`.
+- O projeto manteve CSV como formato de armazenamento. SQLite, histogramas, teste t e comparação com M/M/1 foram avaliados e retirados do escopo confirmado.
+- A coleta extensiva de dados foi concluída.
+- Permanecem pendentes o aprofundamento da comparação Wi-Fi/Ethernet, o refinamento das visualizações e a inspeção manual de tráfego com Wireshark.
+- As decisões metodológicas acima valem para esta versão, uma prova de conceito, e serão revisadas na reescrita (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)).
+
 ## Limitações e pontos a rever
 
 Esta versão é uma prova de conceito. As tabelas registram as fragilidades conhecidas, para orientar a reescrita. A aplicação usa ping para diagnóstico prático; não captura nem inspeciona pacotes e não substitui ferramentas especializadas.
@@ -193,37 +224,6 @@ Esta versão é uma prova de conceito. As tabelas registram as fragilidades conh
 - A interface é um servidor Streamlit local; no Windows, é exibida em WebView2. Isso depende do runtime WebView2 e de um servidor HTTP local.
 - A coleta roda na mesma aplicação da interface; fechar a janela encerra a coleta.
 - Há instalador apenas para Windows x64. O Linux funciona pelo código-fonte, com instalação simplificada para Arch Linux em desenvolvimento; o macOS não foi validado.
-
-## Contexto acadêmico
-
-Projeto Integrador 2026/2 — Faculdade de Princípios Militares.
-
-Equipe: Eduardo Costa Borges, Cid Mendes, João P. Pereira, Fernando Ferreira Vaz, Tamynne Vitória e Paulo Carrijo. Professor: Leonardo A. Portes.
-
-O acompanhamento de destinos LAN, MAN e WAN relaciona o projeto ao conteúdo de Introdução a Redes de Computadores. A análise das medições aplica conceitos de estatística descritiva e correlação.
-
-### Relação com as disciplinas
-
-| Tópico da ementa | Onde aparece no projeto |
-|---|---|
-| Medidas de posição e dispersão | Estatística descritiva (req. 11) |
-| Distribuições de probabilidade | Não coberto; dependia da comparação com Teoria das Filas, fora do escopo confirmado |
-| Correlação | Correlação entre horário do dia e latência (req. 14) |
-| Testes de hipóteses (Z, t) | Removidos do escopo confirmado (req. 12 e 15) |
-| Tipos de rede (LAN, MAN, WAN) | Hosts organizados e detectados por camada |
-| Comandos de diagnóstico (ping, traceroute, ipconfig) | Base da coleta e da detecção de hosts |
-| Protocolos (ICMP) | Utilizado na coleta via ping |
-| Análise de pacotes com Wireshark | Atividade manual complementar, não incorporada ao código |
-
-### Decisões metodológicas e evolução
-
-- O IQR foi escolhido para identificar outliers porque as distribuições de latência tendem a ser assimétricas e valores extremos podem mascarar a detecção por z-score.
-- A agregação por minuto suaviza os gráficos, mas não é usada para detectar outliers, pois poderia ocultar picos reais.
-- O painel Streamlit passou a controlar a coleta; o antigo `main.py` de terminal foi descontinuado e sua lógica multi-host foi incorporada ao `app.py`.
-- O projeto manteve CSV como formato de armazenamento. SQLite, histogramas, teste t e comparação com M/M/1 foram avaliados e retirados do escopo confirmado.
-- A coleta extensiva de dados foi concluída.
-- Permanecem pendentes o aprofundamento da comparação Wi-Fi/Ethernet, o refinamento das visualizações e a inspeção manual de tráfego com Wireshark.
-- As decisões metodológicas acima valem para esta versão, uma prova de conceito, e serão revisadas na reescrita (ver [Limitações e pontos a rever](#limitações-e-pontos-a-rever)).
 
 ## Licença
 
